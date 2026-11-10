@@ -193,11 +193,11 @@ struct StoreTests {
         appStore.toggleAll()
         expect(!appStore.allHidden, "toggle shows all panels")
 
-        let resizeStore = PanelStore(config: .makeDefault(index: 0))
-        let oldTop = resizeStore.config.frame.y + resizeStore.config.frame.height
-        resizeStore.resize(width: 480, height: 440)
-        expect(resizeStore.config.frame.width == 480 && resizeStore.config.frame.height == 440, "resize sets requested size")
-        let newTop = resizeStore.config.frame.y + resizeStore.config.frame.height
+        let originalFrame = PanelFrame.default
+        let resizedFrame = originalFrame.resized(width: 480, height: 440)
+        expect(resizedFrame.width == 480 && resizedFrame.height == 440, "resize sets requested size")
+        let oldTop = originalFrame.y + originalFrame.height
+        let newTop = resizedFrame.y + resizedFrame.height
         expect(abs(newTop - oldTop) < 0.001, "resize keeps the top edge fixed")
 
         let absorbFixture = root.appendingPathComponent("AbsorbFixture", isDirectory: true)

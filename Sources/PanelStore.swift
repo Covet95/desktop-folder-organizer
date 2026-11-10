@@ -1,4 +1,3 @@
-import AppKit
 import Combine
 import Foundation
 
@@ -77,45 +76,7 @@ final class PanelStore: ObservableObject, Identifiable {
         config.frame = frame
     }
 
-    func resize(width: Double, height: Double) {
-        var rect = config.frame.rect
-        rect.origin.y += rect.height - height
-        rect.size.width = width
-        rect.size.height = height
-
-        // 夹紧到屏幕可视区域
-        if let screen = NSScreen.main {
-            let visible = screen.visibleFrame
-            if rect.origin.y < visible.minY {
-                rect.origin.y = visible.minY
-            }
-            if rect.origin.x + rect.width > visible.maxX {
-                rect.origin.x = visible.maxX - rect.width
-            }
-            if rect.origin.y + rect.height > visible.maxY {
-                rect.origin.y = visible.maxY - rect.height
-            }
-        }
-
-        config.frame = PanelFrame(rect: rect)
-    }
-
     func setBackground(hex: String) {
         config.backgroundHex = hex
-    }
-
-    func open(_ item: WidgetItem) {
-        guard item.exists else {
-            NSSound.beep()
-            return
-        }
-        if !NSWorkspace.shared.open(item.url) {
-            NSSound.beep()
-        }
-    }
-
-    func reveal(_ item: WidgetItem) {
-        guard item.exists else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([item.url])
     }
 }

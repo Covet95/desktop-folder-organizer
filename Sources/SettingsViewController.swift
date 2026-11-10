@@ -182,7 +182,24 @@ final class SettingsViewController: NSViewController {
 
     @objc private func sizeChanged(_ sender: NSSegmentedControl) {
         let index = max(0, min(sizes.count - 1, sender.selectedSegment))
-        store.resize(width: sizes[index].0, height: sizes[index].1)
+        var rect = store.config.frame.resized(
+            width: sizes[index].0,
+            height: sizes[index].1
+        ).rect
+
+        if let visible = NSScreen.main?.visibleFrame {
+            if rect.origin.y < visible.minY {
+                rect.origin.y = visible.minY
+            }
+            if rect.origin.x + rect.width > visible.maxX {
+                rect.origin.x = visible.maxX - rect.width
+            }
+            if rect.origin.y + rect.height > visible.maxY {
+                rect.origin.y = visible.maxY - rect.height
+            }
+        }
+
+        store.updateFrame(PanelFrame(rect: rect))
     }
 
     private func closestSizeIndex(to frame: PanelFrame) -> Int {

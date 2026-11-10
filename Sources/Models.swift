@@ -22,6 +22,14 @@ struct PanelFrame: Codable, Equatable {
         CGRect(x: x, y: y, width: width, height: height)
     }
 
+    func resized(width: Double, height: Double) -> PanelFrame {
+        var resizedRect = rect
+        resizedRect.origin.y += resizedRect.height - height
+        resizedRect.size.width = width
+        resizedRect.size.height = height
+        return PanelFrame(rect: resizedRect)
+    }
+
     static let `default` = PanelFrame(x: 140, y: 360, width: 390, height: 360)
 }
 

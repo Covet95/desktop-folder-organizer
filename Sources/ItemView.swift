@@ -130,7 +130,7 @@ final class ItemView: NSView, NSDraggingSource {
     override func mouseUp(with event: NSEvent) {
         defer { mouseDownPoint = nil }
         guard !didStartDrag else { return }
-        store.open(item)
+        open(item)
     }
 
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
@@ -180,11 +180,26 @@ final class ItemView: NSView, NSDraggingSource {
     }
 
     @objc private func openItem() {
-        store.open(item)
+        open(item)
     }
 
     @objc private func revealItem() {
-        store.reveal(item)
+        reveal(item)
+    }
+
+    private func open(_ item: WidgetItem) {
+        guard item.exists else {
+            NSSound.beep()
+            return
+        }
+        if !NSWorkspace.shared.open(item.url) {
+            NSSound.beep()
+        }
+    }
+
+    private func reveal(_ item: WidgetItem) {
+        guard item.exists else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([item.url])
     }
 
     @objc private func previewItem() {
