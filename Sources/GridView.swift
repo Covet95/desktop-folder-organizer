@@ -89,17 +89,7 @@ final class GridView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        window?.makeKey()
-        guard !store.config.positionLocked else { return }
-        // 只在真正拖动时才吸位；单击不触发 snapWindow
-        let locationInEvent = event.locationInWindow
-        let contentRect = bounds
-        if contentRect.contains(locationInEvent) {
-            window?.performDrag(with: event)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.panelView?.maybeSnapWindow()
-            }
-        }
+        panelView?.beginWindowDrag(with: event)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {

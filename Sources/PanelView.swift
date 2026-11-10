@@ -31,6 +31,7 @@ final class PanelView: NSView, NSPopoverDelegate {
 
     private var settingsPopover: NSPopover?
     private var cancellables = Set<AnyCancellable>()
+    private var refreshScheduled = false
     private var trackingArea: NSTrackingArea?
     private var lastConfig: PanelConfig?
     private var primaryColor: NSColor = .white
@@ -96,13 +97,15 @@ final class PanelView: NSView, NSPopoverDelegate {
 
         store.$config
             .sink { [weak self] config in
-                guard let self else { return }
-                let previous = self.lastConfig
-                self.configChanged(config)
-                if previous == nil
-                    || previous?.items != config.items
-                    || previous?.columns != config.columns {
-                    DispatchQueue.main.async { self.refresh() }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    let previous = self.lastConfig
+                    self.configChanged(config)
+                    if previous == nil
+                        || previous?.items != config.items
+                        || previous?.columns != config.columns {
+                        self.scheduleRefresh()
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -110,17 +113,20 @@ final class PanelView: NSView, NSPopoverDelegate {
         store.$searchText
             .sink { [weak self] text in
                 DispatchQueue.main.async {
-                    self?.toolbarView.setSearchText(text)
-                    self?.refresh()
+                    guard let self else { return }
+                    self.toolbarView.setSearchText(text)
+                    self.scheduleRefresh()
                 }
             }
             .store(in: &cancellables)
 
         store.$isSearchVisible
             .sink { [weak self] visible in
-                guard let self else { return }
-                self.toolbarView.setSearchVisible(visible, text: self.store.searchText)
-                DispatchQueue.main.async { self.refresh() }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.toolbarView.setSearchVisible(visible, text: self.store.searchText)
+                    self.scheduleRefresh()
+                }
             }
             .store(in: &cancellables)
     }
@@ -137,10 +143,6 @@ final class PanelView: NSView, NSPopoverDelegate {
 
     var isSearchActive: Bool {
         store.isSearchVisible || !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var isSearching: Bool {
-        isSearchActive
     }
 
     func setHovering(_ hovering: Bool) {
@@ -207,7 +209,7 @@ final class PanelView: NSView, NSPopoverDelegate {
 
         toolbarView.setTintColor(secondaryColor)
         emptyStateView.update(
-            searching: isSearching,
+            searching: isSearchActive,
             primaryColor: primaryColor,
             secondaryColor: secondaryColor
         )
@@ -220,6 +222,17 @@ final class PanelView: NSView, NSPopoverDelegate {
 
         needsDisplay = true
         needsLayout = true
+    }
+
+    private func scheduleRefresh() {
+        guard !refreshScheduled else { return }
+        refreshScheduled = true
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.refreshScheduled = false
+            self.refresh()
+        }
     }
 
     private func refresh() {
@@ -268,16 +281,19 @@ final class PanelView: NSView, NSPopoverDelegate {
     }
 
     override func mouseDown(with event: NSEvent) {
+        beginWindowDrag(with: event)
+    }
+
+    func beginWindowDrag(with event: NSEvent) {
         window?.makeKey()
         guard !store.config.positionLocked else { return }
-        // 检查是否在面板范围内（避免点击工具栏等区域时触发）
-        let locationInEvent = event.locationInWindow
-        if bounds.contains(locationInEvent) {
-            window?.performDrag(with: event)
-            // 延迟判断是否真的发生了拖动（通过比较事件位置与当前窗口位置）
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.maybeSnapWindow()
-            }
+
+        let location = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(location) else { return }
+
+        window?.performDrag(with: event)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.maybeSnapWindow()
         }
     }
 
@@ -371,7 +387,7 @@ final class PanelView: NSView, NSPopoverDelegate {
     }
 
     @objc private func didTapEmptyButton() {
-        if isSearching {
+        if isSearchActive {
             endSearch(clear: true)
         } else {
             fileActions.chooseFiles(from: window)
