@@ -9,6 +9,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private var activityItem: NSMenuItem?
     private var statusMenuItem: NSMenuItem?
     private var cancellables = Set<AnyCancellable>()
+    private var latestAutoAbsorbStatus = AutoAbsorbStatus()
+    private var persistenceWarning: String?
 
     init(delegate: AppDelegate) {
         self.delegate = delegate
@@ -47,7 +49,16 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
 
         delegate.appStore.$autoAbsorbStatus
-            .sink { [weak self] status in self?.updateStatus(status) }
+            .sink { [weak self] status in
+                self?.latestAutoAbsorbStatus = status
+                self?.updateStatusDisplay()
+            }
+            .store(in: &cancellables)
+        delegate.appStore.$persistenceWarning
+            .sink { [weak self] warning in
+                self?.persistenceWarning = warning
+                self?.updateStatusDisplay()
+            }
             .store(in: &cancellables)
         delegate.appStore.$fileOperations
             .sink { [weak self] operations in
@@ -66,7 +77,21 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         return item
     }
 
-    private func updateStatus(_ status: AutoAbsorbStatus) {
+    private func updateStatusDisplay() {
+        if let warning = persistenceWarning {
+            if let button = statusItem.button {
+                button.image = NSImage(
+                    systemSymbolName: "exclamationmark.triangle.fill",
+                    accessibilityDescription: "面板配置需要恢复"
+                )
+                button.image?.size = NSSize(width: 17, height: 17)
+                button.toolTip = "文档整理 · 面板配置需要恢复\n\(warning)"
+            }
+            statusMenuItem?.title = "面板配置需要恢复 · \(warning)"
+            return
+        }
+
+        let status = latestAutoAbsorbStatus
         let warning = status.phase == .retrying || status.phase == .attention
         let symbol = warning
             ? "exclamationmark.triangle.fill"

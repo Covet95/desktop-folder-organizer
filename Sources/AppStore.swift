@@ -5,6 +5,7 @@ final class AppStore: ObservableObject {
     @Published private(set) var panels: [PanelStore] = []
     @Published private(set) var fileOperations: [FileOperationRecord] = []
     @Published private(set) var autoAbsorbStatus = AutoAbsorbStatus()
+    @Published private(set) var persistenceWarning: String?
 
     // Keep the established result type available to existing UI call sites.
     typealias AbsorbResult = FileOperationService.AbsorbResult
@@ -13,12 +14,15 @@ final class AppStore: ObservableObject {
     var onShowFileActivity: (() -> Void)?
     var onFileRestored: ((URL) -> Void)?
 
-    private let persistence: Persistence
+    private let persistence: PanelStateRepository
     private let fileOperationService: FileOperationService
     private let configuredStorageDirectory: URL?
     private var saveWork: DispatchWorkItem?
 
-    init(persistence: Persistence = Persistence(), storageDirectory: URL? = nil) {
+    init(
+        persistence: PanelStateRepository = JSONPanelStateRepository(),
+        storageDirectory: URL? = nil
+    ) {
         self.persistence = persistence
         self.configuredStorageDirectory = storageDirectory
 
@@ -33,9 +37,13 @@ final class AppStore: ObservableObject {
             )
         }
 
-        if let saved = persistence.load(), !saved.isEmpty {
+        switch persistence.load() {
+        case .loaded(let saved) where !saved.isEmpty:
             panels = saved.map(PanelStore.init)
-        } else {
+        case .recoveryRequired(let warning):
+            persistenceWarning = warning
+            panels = [PanelStore(config: .makeDefault(index: 0))]
+        case .missing, .loaded:
             panels = [PanelStore(config: .makeDefault(index: 0))]
         }
         panels.forEach(attach)
@@ -46,8 +54,6 @@ final class AppStore: ObservableObject {
         service.onRecoveryAttention = { [weak self] message in
             self?.updateAutoAbsorbStatus(phase: .attention, pendingCount: 1, message: message)
         }
-
-        saveNow()
     }
 
     var storageDirectory: URL {
@@ -171,7 +177,14 @@ final class AppStore: ObservableObject {
     func saveNow() {
         saveWork?.cancel()
         saveWork = nil
-        persistence.save(panels.map(\.config))
+
+        do {
+            try persistence.save(panels.map(\.config))
+            persistenceWarning = nil
+        } catch {
+            persistenceWarning = error.localizedDescription
+            NSLog("DesktopFolderWidget: panel state save failed: \(error)")
+        }
     }
 
     private func attach(_ panel: PanelStore) {

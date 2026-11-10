@@ -1,5 +1,30 @@
 import Foundation
 
+private final class InMemoryPanelStateRepository: PanelStateRepository {
+    let supportDirectory: URL
+    var loadResult: PanelStateLoadResult
+    var shouldFailSave = false
+    private(set) var savedStates: [[PanelConfig]] = []
+
+    init(directory: URL, loadResult: PanelStateLoadResult = .missing) {
+        self.supportDirectory = directory
+        self.loadResult = loadResult
+    }
+
+    func load() -> PanelStateLoadResult { loadResult }
+
+    func save(_ panels: [PanelConfig]) throws {
+        if shouldFailSave {
+            throw TestRepositoryError.saveFailed
+        }
+        savedStates.append(panels)
+    }
+}
+
+private enum TestRepositoryError: Error {
+    case saveFailed
+}
+
 @main
 struct StoreTests {
     static func main() {
@@ -78,16 +103,58 @@ struct StoreTests {
         expect(!store.config.items.contains(where: { $0.name == "不存在.txt" }), "missing file removed")
 
         let supportDir = root.appendingPathComponent("support", isDirectory: true)
-        let persistence = Persistence(directory: supportDir)
+        let persistence = JSONPanelStateRepository(directory: supportDir)
         let appStore = AppStore(persistence: persistence)
         expect(appStore.panels.count == 1, "app store creates one default panel")
 
         appStore.panels[0].add(urls: [report, budget])
         appStore.saveNow()
-        let loaded = persistence.load()
+        let loaded: [PanelConfig]?
+        if case .loaded(let panels) = persistence.load() {
+            loaded = panels
+        } else {
+            loaded = nil
+        }
         expect(loaded?.count == 1, "panels persist")
         expect(loaded?.first?.items.count == 2, "items persist")
         expect(loaded?.first?.items.first?.name == "报告.pdf", "saved item name survives")
+
+        let memoryRepository = InMemoryPanelStateRepository(
+            directory: root.appendingPathComponent("InMemorySupport", isDirectory: true)
+        )
+        let isolatedAppStore = AppStore(persistence: memoryRepository)
+        isolatedAppStore.panels[0].add(urls: [report])
+        isolatedAppStore.saveNow()
+        expect(
+            memoryRepository.savedStates.last?.first?.items.count == 1,
+            "AppStore persists panel state through the repository contract"
+        )
+
+        let failingMemoryRepository = InMemoryPanelStateRepository(
+            directory: root.appendingPathComponent("FailingInMemorySupport", isDirectory: true)
+        )
+        failingMemoryRepository.shouldFailSave = true
+        let failingPersistenceStore = AppStore(persistence: failingMemoryRepository)
+        failingPersistenceStore.saveNow()
+        expect(
+            failingPersistenceStore.persistenceWarning != nil,
+            "AppStore exposes persistence write failures to observers"
+        )
+
+        let protectedDirectory = root.appendingPathComponent("ProtectedSupport", isDirectory: true)
+        try! fileManager.createDirectory(at: protectedDirectory, withIntermediateDirectories: true)
+        let protectedStateURL = protectedDirectory.appendingPathComponent("panels.json")
+        let protectedBytes = Data("{broken-state".utf8)
+        try! protectedBytes.write(to: protectedStateURL)
+        let protectedStore = AppStore(
+            persistence: JSONPanelStateRepository(directory: protectedDirectory)
+        )
+        expect(protectedStore.persistenceWarning != nil, "AppStore exposes a damaged-state warning")
+        protectedStore.saveNow()
+        expect(
+            (try? Data(contentsOf: protectedStateURL)) == protectedBytes,
+            "AppStore does not overwrite a damaged state file with defaults"
+        )
 
         let encoded = try! JSONEncoder().encode(store.config)
         let decoded = try! JSONDecoder().decode(PanelConfig.self, from: encoded)
@@ -200,7 +267,7 @@ struct StoreTests {
         let idempotentSource = root.appendingPathComponent("IdempotentSource.txt")
         fileManager.createFile(atPath: idempotentSource.path, contents: Data("same file".utf8))
         let idempotentStore = AppStore(
-            persistence: Persistence(directory: idempotentSupport),
+            persistence: JSONPanelStateRepository(directory: idempotentSupport),
             storageDirectory: idempotentStorage
         )
         var firstAsyncResult: AppStore.AbsorbResult?
@@ -242,7 +309,7 @@ struct StoreTests {
             contents: Data("nested".utf8)
         )
         let collisionStore = AppStore(
-            persistence: Persistence(directory: root.appendingPathComponent("CollisionSupport")),
+            persistence: JSONPanelStateRepository(directory: root.appendingPathComponent("CollisionSupport")),
             storageDirectory: collisionStorage
         )
         var collisionResult: AppStore.AbsorbResult?
@@ -288,7 +355,7 @@ struct StoreTests {
         let recoverableSource = root.appendingPathComponent("可恢复收纳.txt")
         fileManager.createFile(atPath: recoverableSource.path, contents: Data("recover".utf8))
         let recoverableStore = AppStore(
-            persistence: Persistence(directory: root.appendingPathComponent("RecoverableSupport")),
+            persistence: JSONPanelStateRepository(directory: root.appendingPathComponent("RecoverableSupport")),
             storageDirectory: blockedStorage
         )
         var blockedResult: AppStore.AbsorbResult?
@@ -398,7 +465,7 @@ struct StoreTests {
         let undoSource = undoDesktop.appendingPathComponent("待恢复.txt")
         fileManager.createFile(atPath: undoSource.path, contents: Data("undo".utf8))
         let undoStore = AppStore(
-            persistence: Persistence(directory: root.appendingPathComponent("UndoSupport")),
+            persistence: JSONPanelStateRepository(directory: root.appendingPathComponent("UndoSupport")),
             storageDirectory: undoStorage
         )
         undoStore.newPanel()

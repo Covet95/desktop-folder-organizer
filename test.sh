@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 mkdir -p build
 swiftc -swift-version 5 -parse-as-library \
     Sources/Models.swift \
-    Sources/Persistence.swift \
+    Sources/PanelStateRepository.swift \
     Sources/FileOperationJournal.swift \
     Sources/FileOperationService.swift \
     Sources/AutoAbsorbStatus.swift \
@@ -18,3 +18,21 @@ swiftc -swift-version 5 -parse-as-library \
     -o build/StoreTests
 
 ./build/StoreTests
+
+echo
+echo "=== PANEL STATE REPOSITORY TESTS ==="
+swiftc -swift-version 5 -parse-as-library \
+    Sources/Models.swift \
+    Sources/PanelStateRepository.swift \
+    Tests/PanelStateRepositoryTests.swift \
+    -o build/PanelStateRepositoryTests
+./build/PanelStateRepositoryTests
+
+echo
+echo "=== FILE OPERATION SERVICE TESTS ==="
+swiftc -swift-version 5 -parse-as-library \
+    Sources/FileOperationJournal.swift \
+    Sources/FileOperationService.swift \
+    Tests/FileOperationServiceTests.swift \
+    -o build/FileOperationServiceTests
+./build/FileOperationServiceTests

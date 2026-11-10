@@ -39,7 +39,7 @@ final class SnapshotRunner {
         }
         urls = fixtureURLs
 
-        let persistence = Persistence(directory: root.appendingPathComponent("support", isDirectory: true))
+        let persistence = JSONPanelStateRepository(directory: root.appendingPathComponent("support", isDirectory: true))
         let storageDir = root.appendingPathComponent("storage", isDirectory: true)
         try! FileManager.default.createDirectory(at: storageDir, withIntermediateDirectories: true)
         appStore = AppStore(persistence: persistence, storageDirectory: storageDir)

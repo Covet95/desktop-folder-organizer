@@ -23,6 +23,7 @@
 - 从面板选择或拖入外部文件时，同样会移动原文件
 - 面板中的“移除”只移除面板引用，不删除磁盘上的文件
 - 面板布局和文件引用保存在 `~/Library/Application Support/DesktopFolderWidget/panels.json`
+- 面板配置损坏、无法读取或版本不兼容时，保留原文件并阻止默认配置覆盖；菜单栏显示恢复警告
 - 文件操作日志保存在同目录的 file-operations.json，记录自动收纳、手动收纳和重命名
 - 文件移动采用写前日志：先持久化原路径与目标路径，再执行移动，最后提交完成状态
 - 应用异常退出后会核对原位置、目标位置和恢复目标，自动补全能够确定的操作；无法确定时标记为需要检查
@@ -40,8 +41,9 @@
 - AppDelegate.swift：应用生命周期、菜单、全局快捷键和面板窗口同步
 - DesktopIntakeCoordinator.swift：桌面监控生命周期、启动状态和自动收纳编排
 - DesktopWatcher.swift：文件稳定性检测、重复识别和失败退避重试
-- AppStore.swift：应用级面板状态、配置持久化及文件操作门面
-- FileOperationService.swift：串行文件移动、重命名、恢复及操作日志协调
+- AppStore.swift：应用级面板状态、持久化与文件操作的协调门面
+- PanelStateRepository.swift：面板配置仓储契约、JSON 编解码、版本检查和损坏数据保护
+- FileOperationService.swift：独立执行串行文件移动、重命名、恢复及操作日志协调
 - PanelStore.swift：单个面板配置、搜索状态和条目操作
 - PanelView.swift：面板视图组合、外观、布局和键鼠交互
 - PanelToolbarView.swift、PanelEmptyStateView.swift：独立的界面组件
@@ -50,7 +52,7 @@
 - FileOperationJournal.swift：文件操作写前日志、状态持久化和异常恢复
 - FileActivityWindowController.swift：操作历史、状态反馈和恢复界面
 
-视图层不直接执行文件移动；文件操作统一经过 AppStore 和操作日志。桌面自动收纳由 DesktopIntakeCoordinator 编排，AppDelegate 不负责文件筛选和移动流程。
+视图层不直接执行文件移动；文件操作统一经过 AppStore 和 FileOperationService。面板配置通过 PanelStateRepository 持久化，文件操作日志由 FileOperationService 管理。桌面自动收纳由 DesktopIntakeCoordinator 编排，AppDelegate 不负责文件筛选和移动流程。
 
 ## 构建
 
@@ -81,7 +83,7 @@ CODESIGN_IDENTITY="Developer ID Application: <证书名称>" ./build.sh
 
 ## 测试
 
-- test.sh：模型、状态、持久化、写前日志、崩溃恢复、重命名、撤销恢复和桌面监控测试；使用临时目录
+- test.sh：运行 AppStore 集成测试、PanelStateRepository 独立测试和 FileOperationService 独立测试；均使用临时目录
 - `./snapshot.sh`：会创建 UI 窗口并在 `/tmp` 写入截图
 - `./feature_tests.sh`：包含 Quick Look 窗口和全局快捷键测试，不适合在用户正在工作的桌面上无提示执行
 
