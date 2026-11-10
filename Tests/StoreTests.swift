@@ -200,6 +200,20 @@ struct StoreTests {
         let newTop = resizedFrame.y + resizedFrame.height
         expect(abs(newTop - oldTop) < 0.001, "resize keeps the top edge fixed")
 
+        let visibleFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let offscreenFrame = PanelFrame(x: -120, y: 820, width: 390, height: 360)
+            .clamped(to: visibleFrame)
+        expect(
+            offscreenFrame.x == 0 && offscreenFrame.y == 540,
+            "clamp keeps the full panel frame inside the visible screen"
+        )
+        let oversizedFrame = PanelFrame(x: 500, y: 500, width: 1600, height: 1000)
+            .clamped(to: visibleFrame)
+        expect(
+            oversizedFrame.x == 0 && oversizedFrame.y == 0,
+            "clamp anchors oversized panels to the visible screen origin"
+        )
+
         let absorbFixture = root.appendingPathComponent("AbsorbFixture", isDirectory: true)
         let storageFixture = root.appendingPathComponent("AbsorbStorage", isDirectory: true)
         try! fileManager.createDirectory(at: absorbFixture, withIntermediateDirectories: true)

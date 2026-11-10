@@ -39,6 +39,9 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
         shouldCascadeWindows = false
 
         window.delegate = self
+        panelView.onWindowDragEnded = { [weak self] in
+            self?.keepWindowVisible()
+        }
 
         if frame != store.config.frame.rect {
             store.updateFrame(PanelFrame(rect: frame))
@@ -93,6 +96,18 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    private func keepWindowVisible() {
+        guard
+            let window,
+            !store.config.positionLocked,
+            let visibleFrame = (window.screen ?? NSScreen.main)?.visibleFrame
+        else { return }
+
+        let target = PanelFrame(rect: window.frame).clamped(to: visibleFrame).rect
+        guard !Self.framesClose(window.frame, target) else { return }
+        window.setFrame(target, display: true)
+    }
+
     private func installKeyMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, let window = self.window, window.isKeyWindow else { return event }
@@ -136,14 +151,11 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
     private static func saneFrame(_ frame: CGRect) -> CGRect {
         let screens = NSScreen.screens
         let center = CGPoint(x: frame.midX, y: frame.midY)
-        if screens.contains(where: { $0.visibleFrame.insetBy(dx: -40, dy: -40).contains(center) }) {
-            return frame
-        }
-        let visible = (NSScreen.main ?? screens.first)?.visibleFrame
-            ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
-        var adjusted = frame
-        adjusted.origin.x = visible.minX + 40
-        adjusted.origin.y = visible.maxY - adjusted.height - 40
-        return adjusted
+        let screen = screens.first {
+            $0.visibleFrame.insetBy(dx: -40, dy: -40).contains(center)
+        } ?? NSScreen.main ?? screens.first
+
+        guard let screen else { return frame }
+        return PanelFrame(rect: frame).clamped(to: screen.visibleFrame).rect
     }
 }

@@ -6,6 +6,7 @@ final class PanelView: NSView, NSPopoverDelegate {
 
     let store: PanelStore
     let appStore: AppStore
+    var onWindowDragEnded: (() -> Void)?
 
     private let scrollView = NSScrollView()
     private let gridView: GridView
@@ -293,50 +294,8 @@ final class PanelView: NSView, NSPopoverDelegate {
 
         window?.performDrag(with: event)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            self?.maybeSnapWindow()
+            self?.onWindowDragEnded?()
         }
-    }
-
-    func maybeSnapWindow() {
-        guard window != nil, !store.config.positionLocked else { return }
-        // 这里简化处理：如果窗口没有明显移动，就不吸位
-        // 更精确的做法是记录鼠标按下时的窗口位置，比较是否有变化
-        // 当前实现：仅在拖动结束后才考虑吸位
-        // 由于 performDrag 已经由系统处理，我们只在这里做边界检查
-        snapWindow(applyOnlyIfOutOfVisibleFrame: true)
-    }
-
-    func snapWindow(applyOnlyIfOutOfVisibleFrame: Bool = false) {
-        guard let window, !store.config.positionLocked else { return }
-
-        let step: CGFloat = 20
-        var frame = window.frame
-        var origin = frame.origin
-        origin.x = (origin.x / step).rounded() * step
-        origin.y = (origin.y / step).rounded() * step
-
-        if let screen = window.screen ?? NSScreen.main {
-            let visible = screen.visibleFrame
-            if abs(origin.x - visible.minX) < 12 { origin.x = visible.minX }
-            if abs(origin.x + frame.width - visible.maxX) < 12 { origin.x = visible.maxX - frame.width }
-            if abs(origin.y - visible.minY) < 12 { origin.y = visible.minY }
-            if abs(origin.y + frame.height - visible.maxY) < 12 { origin.y = visible.maxY - frame.height }
-        }
-
-        // 如果只检查可见帧，且当前已在可见帧内，则不应用网格吸附
-        if applyOnlyIfOutOfVisibleFrame {
-            if let screen = window.screen ?? NSScreen.main {
-                let visible = screen.visibleFrame
-                let currentOrigin = window.frame.origin
-                if visible.contains(currentOrigin) {
-                    return
-                }
-            }
-        }
-
-        guard origin != frame.origin else { return }
-        frame.origin = origin
-        window.setFrame(frame, display: true)
     }
 
     override func cancelOperation(_ sender: Any?) {

@@ -30,6 +30,19 @@ struct PanelFrame: Codable, Equatable {
         return PanelFrame(rect: resizedRect)
     }
 
+    func clamped(to visibleFrame: CGRect) -> PanelFrame {
+        var clampedRect = rect
+
+        clampedRect.origin.x = clampedRect.width >= visibleFrame.width
+            ? visibleFrame.minX
+            : min(max(clampedRect.minX, visibleFrame.minX), visibleFrame.maxX - clampedRect.width)
+        clampedRect.origin.y = clampedRect.height >= visibleFrame.height
+            ? visibleFrame.minY
+            : min(max(clampedRect.minY, visibleFrame.minY), visibleFrame.maxY - clampedRect.height)
+
+        return PanelFrame(rect: clampedRect)
+    }
+
     static let `default` = PanelFrame(x: 140, y: 360, width: 390, height: 360)
 }
 
