@@ -40,7 +40,8 @@
 - AppDelegate.swift：应用生命周期、菜单、全局快捷键和面板窗口同步
 - DesktopIntakeCoordinator.swift：桌面监控生命周期、启动状态和自动收纳编排
 - DesktopWatcher.swift：文件稳定性检测、重复识别和失败退避重试
-- AppStore.swift：应用级面板状态、配置持久化及文件操作入口
+- AppStore.swift：应用级面板状态、配置持久化及文件操作门面
+- FileOperationService.swift：串行文件移动、重命名、恢复及操作日志协调
 - PanelStore.swift：单个面板配置、搜索状态和条目操作
 - PanelView.swift：面板视图组合、外观、布局和键鼠交互
 - PanelToolbarView.swift、PanelEmptyStateView.swift：独立的界面组件

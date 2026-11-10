@@ -8,6 +8,7 @@ swiftc -swift-version 5 -parse-as-library \
     Sources/Models.swift \
     Sources/Persistence.swift \
     Sources/FileOperationJournal.swift \
+    Sources/FileOperationService.swift \
     Sources/AutoAbsorbStatus.swift \
     Sources/PanelStore.swift \
     Sources/AppStore.swift \

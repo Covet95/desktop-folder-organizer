@@ -142,10 +142,10 @@ struct StoreTests {
         let fakeApp = appFolder.appendingPathComponent("build/文档整理.app", isDirectory: true)
         try! fileManager.createDirectory(at: fakeApp, withIntermediateDirectories: true)
 
-        let appPath = AppStore.canonicalPath(fakeApp)
-        let storagePath = AppStore.canonicalPath(storageFixture)
+        let appPath = FileOperationService.canonicalPath(fakeApp)
+        let storagePath = FileOperationService.canonicalPath(storageFixture)
         expect(
-            AppStore.absorbDisposition(
+            FileOperationService.absorbDisposition(
                 for: appFolder,
                 storagePath: storagePath,
                 appPath: appPath
@@ -153,7 +153,7 @@ struct StoreTests {
             "absorb refuses a directory containing the application bundle"
         )
         expect(
-            AppStore.absorbDisposition(
+            FileOperationService.absorbDisposition(
                 for: fakeApp,
                 storagePath: storagePath,
                 appPath: appPath
@@ -164,7 +164,7 @@ struct StoreTests {
         let alreadyStored = storageFixture.appendingPathComponent("已收纳.txt")
         fileManager.createFile(atPath: alreadyStored.path, contents: Data("stored".utf8))
         expect(
-            AppStore.absorbDisposition(
+            FileOperationService.absorbDisposition(
                 for: alreadyStored,
                 storagePath: storagePath,
                 appPath: appPath
@@ -176,9 +176,9 @@ struct StoreTests {
         let nestedStorage = storageAncestor.appendingPathComponent("Managed", isDirectory: true)
         try! fileManager.createDirectory(at: storageAncestor, withIntermediateDirectories: true)
         expect(
-            AppStore.absorbDisposition(
+            FileOperationService.absorbDisposition(
                 for: storageAncestor,
-                storagePath: AppStore.canonicalPath(nestedStorage),
+                storagePath: FileOperationService.canonicalPath(nestedStorage),
                 appPath: appPath
             ) == .reject,
             "absorb refuses a directory that contains the storage directory"
@@ -187,7 +187,7 @@ struct StoreTests {
         let externalFile = absorbFixture.appendingPathComponent("普通桌面文件.txt")
         fileManager.createFile(atPath: externalFile.path, contents: Data("move".utf8))
         expect(
-            AppStore.absorbDisposition(
+            FileOperationService.absorbDisposition(
                 for: externalFile,
                 storagePath: storagePath,
                 appPath: appPath
