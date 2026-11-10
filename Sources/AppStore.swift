@@ -18,6 +18,7 @@ final class AppStore: ObservableObject {
     private let fileOperationService: FileOperationService
     private let configuredStorageDirectory: URL?
     private var saveWork: DispatchWorkItem?
+    private var panelSubscriptions: [UUID: AnyCancellable] = [:]
 
     init(
         persistence: PanelStateRepository = JSONPanelStateRepository(),
@@ -46,7 +47,7 @@ final class AppStore: ObservableObject {
         case .missing, .loaded:
             panels = [PanelStore(config: .makeDefault(index: 0))]
         }
-        panels.forEach(attach)
+        panels.forEach(observe)
 
         service.onOperationsChanged = { [weak self] operations in
             self?.fileOperations = operations
@@ -72,13 +73,14 @@ final class AppStore: ObservableObject {
 
     func newPanel() {
         let panel = PanelStore(config: .makeDefault(index: panels.count))
-        attach(panel)
+        observe(panel)
         panels.append(panel)
         scheduleSave()
     }
 
     func removePanel(_ panel: PanelStore) {
         guard canDeletePanel, let index = panels.firstIndex(where: { $0.id == panel.id }) else { return }
+        panelSubscriptions[panel.id] = nil
         panels.remove(at: index)
         scheduleSave()
     }
@@ -187,8 +189,10 @@ final class AppStore: ObservableObject {
         }
     }
 
-    private func attach(_ panel: PanelStore) {
-        panel.onChange = { [weak self] in self?.scheduleSave() }
+    private func observe(_ panel: PanelStore) {
+        panelSubscriptions[panel.id] = panel.$config
+            .dropFirst()
+            .sink { [weak self] _ in self?.scheduleSave() }
     }
 
     private func scheduleSave() {

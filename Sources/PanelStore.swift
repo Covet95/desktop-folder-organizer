@@ -8,16 +8,9 @@ final class PanelStore: ObservableObject, Identifiable {
     @Published var searchText: String = ""
     @Published var isSearchVisible: Bool = false
 
-    var onChange: (() -> Void)?
-    private var cancellables = Set<AnyCancellable>()
-
     init(config: PanelConfig) {
         self.id = config.id
         self.config = config
-        $config
-            .dropFirst()
-            .sink { [weak self] _ in self?.onChange?() }
-            .store(in: &cancellables)
     }
 
     var filteredItems: [WidgetItem] {
