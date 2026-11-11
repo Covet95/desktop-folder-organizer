@@ -44,7 +44,6 @@ final class SnapshotRunner {
         try! FileManager.default.createDirectory(at: storageDir, withIntermediateDirectories: true)
         appStore = AppStore(persistence: persistence, storageDirectory: storageDir)
         store = appStore.panels[0]
-        store.config.backgroundHex = "#1C1C1E"
         store.config.opacity = 1.0
         store.config.columns = 5
 
@@ -63,7 +62,7 @@ final class SnapshotRunner {
 
         let settings = SettingsViewController(store: store, appStore: appStore)
         settingsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 360),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 334),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -93,7 +92,7 @@ final class SnapshotRunner {
             capture(panelView, "/tmp/dfw_items_dark.png")
             testReorder()
         case 3:
-            store.config.backgroundHex = "#F2F2F7"
+            panelWindow.appearance = NSAppearance(named: .aqua)
         case 4:
             capture(panelView, "/tmp/dfw_items_light.png")
             panelView.setHovering(true)
@@ -109,7 +108,8 @@ final class SnapshotRunner {
         case 8:
             store.searchText = ""
             store.isSearchVisible = false
-            store.config.backgroundHex = "#0F3D3A"
+            panelWindow.appearance = NSAppearance(named: .darkAqua)
+            settingsWindow.appearance = NSAppearance(named: .darkAqua)
             settingsWindow.orderFrontRegardless()
         case 9:
             if let content = settingsWindow.contentView {

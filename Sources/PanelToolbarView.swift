@@ -41,12 +41,12 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func setTintColor(_ color: NSColor, backgroundHex: String) {
+    func applyAppearance(primaryColor: NSColor, secondaryColor: NSColor) {
         for button in [searchButton, addButton, settingsButton] {
-            button.contentTintColor = color
+            button.contentTintColor = secondaryColor
         }
-        searchField.textColor = PanelAppearance.primaryText
-        searchField.backgroundColor = PanelAppearance.controlFill(for: backgroundHex)
+        searchField.textColor = primaryColor
+        searchField.backgroundColor = PanelAppearance.controlFill
     }
 
     func setHovering(_ hovering: Bool) {

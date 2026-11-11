@@ -6,12 +6,16 @@ cd "$(dirname "$0")"
 mkdir -p build
 swiftc -swift-version 5 -parse-as-library \
     Sources/Models.swift \
+    Sources/PanelAppearance.swift \
     Sources/ColorHex.swift \
-    Sources/Persistence.swift \
+    Sources/PanelStateRepository.swift \
     Sources/FileOperationJournal.swift \
+    Sources/FileOperationService.swift \
     Sources/AutoAbsorbStatus.swift \
     Sources/PanelStore.swift \
     Sources/AppStore.swift \
+    Sources/DesktopWatcher.swift \
+    Sources/DesktopIntakeCoordinator.swift \
     Sources/IconProvider.swift \
     Sources/ItemView.swift \
     Sources/AddTileView.swift \

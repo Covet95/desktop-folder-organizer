@@ -11,7 +11,6 @@ final class PanelView: NSView, NSPopoverDelegate {
     private let scrollView = NSScrollView()
     private let gridView: GridView
     private let effectView = PassthroughVisualEffectView()
-    private let tintView = PassthroughTintView()
     private let toolbarView = PanelToolbarView()
     private let quickLook = QuickLookController()
     private lazy var fileActions = PanelFileActionCoordinator(appStore: appStore, panelStore: store)
@@ -57,10 +56,6 @@ final class PanelView: NSView, NSPopoverDelegate {
         effectView.autoresizingMask = [.width, .height]
         effectView.wantsLayer = true
         addSubview(effectView)
-
-        tintView.autoresizingMask = [.width, .height]
-        tintView.wantsLayer = true
-        addSubview(tintView)
 
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
@@ -185,33 +180,16 @@ final class PanelView: NSView, NSPopoverDelegate {
         let previous = lastConfig
         lastConfig = config
 
-        let panelAppearance = PanelAppearance.appearance(for: config.backgroundHex)
-        if appearance?.name != panelAppearance.name {
-            appearance = panelAppearance
-        }
-        if effectView.appearance?.name != panelAppearance.name {
-            effectView.appearance = panelAppearance
-        }
-        if tintView.appearance?.name != panelAppearance.name {
-            tintView.appearance = panelAppearance
-        }
-
         primaryColor = PanelAppearance.primaryText
         secondaryColor = PanelAppearance.secondaryText
 
         effectView.material = PanelAppearance.material(for: config.levelMode)
-        // Material opacity controls how much desktop wallpaper comes through.
-        // The independent tint wash stays subtle and never fades the file content.
+        // Only the native wallpaper-sampling material is faded.
+        // File icons, labels and controls remain fully opaque above this layer.
         effectView.alphaValue = CGFloat(
             min(max(config.opacity, PanelAppearance.minimumMaterialOpacity),
                 PanelAppearance.maximumMaterialOpacity)
         )
-        let tint = PanelAppearance.customTint(for: config.backgroundHex)
-        tintView.layer?.backgroundColor = tint
-            .withAlphaComponent(PanelAppearance.tintOpacity).cgColor
-        tintView.layer?.cornerRadius = config.cornerRadius
-        tintView.layer?.cornerCurve = .continuous
-        tintView.layer?.masksToBounds = true
         effectView.layer?.cornerRadius = config.cornerRadius
         effectView.layer?.cornerCurve = .continuous
         effectView.layer?.masksToBounds = true
@@ -220,9 +198,9 @@ final class PanelView: NSView, NSPopoverDelegate {
         layer?.cornerRadius = config.cornerRadius
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
-        layer?.borderColor = PanelAppearance.border(for: config.backgroundHex).cgColor
+        layer?.borderColor = PanelAppearance.border.cgColor
 
-        toolbarView.setTintColor(secondaryColor, backgroundHex: config.backgroundHex)
+        toolbarView.applyAppearance(primaryColor: primaryColor, secondaryColor: secondaryColor)
         emptyStateView.update(
             searching: isSearchActive,
             primaryColor: primaryColor,
@@ -362,7 +340,6 @@ final class PanelView: NSView, NSPopoverDelegate {
         let contentRect = CGRect(x: padding, y: contentY, width: contentWidth, height: contentHeight)
 
         effectView.frame = bounds
-        tintView.frame = bounds
         scrollView.frame = contentRect
         gridView.frame.size.width = scrollView.contentSize.width
         gridView.needsLayout = true
@@ -408,7 +385,6 @@ final class PanelView: NSView, NSPopoverDelegate {
 
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.appearance = PanelAppearance.appearance(for: store.config.backgroundHex)
         popover.delegate = self
 
         let controller = SettingsViewController(store: store, appStore: appStore)
@@ -470,14 +446,10 @@ final class PanelView: NSView, NSPopoverDelegate {
         layer?.borderWidth = active ? 2 : 1
         layer?.borderColor = active
             ? NSColor.controlAccentColor.withAlphaComponent(0.72).cgColor
-            : PanelAppearance.border(for: store.config.backgroundHex).cgColor
+            : PanelAppearance.border.cgColor
     }
 }
 
 final class PassthroughVisualEffectView: NSVisualEffectView {
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-}
-
-final class PassthroughTintView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

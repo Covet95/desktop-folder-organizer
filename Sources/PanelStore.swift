@@ -97,7 +97,4 @@ final class PanelStore: ObservableObject, Identifiable {
         config.frame = frame
     }
 
-    func setBackground(hex: String) {
-        config.backgroundHex = hex
-    }
 }
