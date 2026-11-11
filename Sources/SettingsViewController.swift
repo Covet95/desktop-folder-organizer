@@ -6,7 +6,7 @@ final class SettingsViewController: NSViewController {
     private let appStore: AppStore
     var onDelete: (() -> Void)?
 
-    private let presets = ["#1C1C1E", "#0F3D3A", "#3A2E52", "#F2F2F7", "#FFFFFF", "#1E3A5F"]
+    private let presets = ["#1C1C1E", "#DCE6F2", "#E8E0F1", "#DFEBE2", "#F1E6D9", "#E6E8EB"]
     private let sizes: [(Double, Double)] = [(330, 300), (390, 360), (480, 440)]
     private var swatches: [NSButton] = []
     private let colorWell = NSColorWell(frame: .zero)
@@ -24,7 +24,7 @@ final class SettingsViewController: NSViewController {
         self.store = store
         self.appStore = appStore
         super.init(nibName: nil, bundle: nil)
-        preferredContentSize = NSSize(width: 300, height: 360)
+        preferredContentSize = NSSize(width: 320, height: 372)
     }
 
     required init?(coder: NSCoder) {
@@ -32,86 +32,98 @@ final class SettingsViewController: NSViewController {
     }
 
     override func loadView() {
-        let root = FlippedView(frame: NSRect(x: 0, y: 0, width: 300, height: 360))
+        let root = FlippedView(frame: NSRect(x: 0, y: 0, width: 320, height: 372))
+        root.onAppearanceChanged = { [weak self] in
+            guard let self else { return }
+            self.update(self.store.config)
+        }
         view = root
 
-        addLabel("面板设置", frame: CGRect(x: 16, y: 14, width: 268, height: 18), font: .systemFont(ofSize: 13, weight: .semibold))
-        addLabel("背景颜色", frame: CGRect(x: 16, y: 44, width: 268, height: 14), font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
+        addLabel("面板设置", frame: CGRect(x: 18, y: 16, width: 284, height: 20), font: .systemFont(ofSize: 14, weight: .semibold))
+        addLabel("材质色调", frame: CGRect(x: 18, y: 48, width: 284, height: 16), font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
 
         for (index, hex) in presets.enumerated() {
-            let button = NSButton(frame: CGRect(x: 16 + CGFloat(index) * 28, y: 66, width: 22, height: 22))
+            let button = NSButton(frame: CGRect(x: 18 + CGFloat(index) * 30, y: 72, width: 24, height: 24))
             button.title = ""
             button.isBordered = false
             button.tag = index
+            button.toolTip = index == 0 ? "跟随 macOS 外观" : "轻量自定义色调"
             button.target = self
             button.action = #selector(swatchTapped(_:))
             button.wantsLayer = true
-            button.layer?.cornerRadius = 11
-            button.layer?.backgroundColor = NSColor(hex: hex).cgColor
+            button.layer?.cornerRadius = 12
+            button.layer?.backgroundColor = (index == 0 ? NSColor.windowBackgroundColor : NSColor(hex: hex)).cgColor
             root.addSubview(button)
             swatches.append(button)
         }
 
-        colorWell.frame = CGRect(x: 190, y: 66, width: 22, height: 22)
+        colorWell.frame = CGRect(x: 218, y: 72, width: 24, height: 24)
         colorWell.colorWellStyle = .minimal
         colorWell.target = self
         colorWell.action = #selector(colorWellChanged(_:))
         root.addSubview(colorWell)
 
-        addLabel("不透明度", frame: CGRect(x: 16, y: 104, width: 70, height: 18), font: .systemFont(ofSize: 12))
-        opacitySlider.frame = CGRect(x: 92, y: 102, width: 150, height: 20)
+        addLabel("背景不透明度", frame: CGRect(x: 18, y: 116, width: 76, height: 18), font: .systemFont(ofSize: 12))
+        opacitySlider.frame = CGRect(x: 102, y: 114, width: 156, height: 20)
+        opacitySlider.controlSize = .small
         opacitySlider.target = self
         opacitySlider.action = #selector(opacityChanged(_:))
         root.addSubview(opacitySlider)
-        opacityValue.frame = CGRect(x: 246, y: 104, width: 40, height: 18)
+        opacityValue.frame = CGRect(x: 264, y: 116, width: 38, height: 18)
         opacityValue.alignment = .right
         opacityValue.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         root.addSubview(opacityValue)
 
-        addLabel("每行图标", frame: CGRect(x: 16, y: 138, width: 100, height: 18), font: .systemFont(ofSize: 12))
-        columnsStepper.frame = CGRect(x: 234, y: 135, width: 20, height: 24)
+        addLabel("每行图标", frame: CGRect(x: 18, y: 152, width: 100, height: 18), font: .systemFont(ofSize: 12))
+        columnsStepper.frame = CGRect(x: 250, y: 149, width: 20, height: 24)
+        columnsStepper.controlSize = .small
         columnsStepper.minValue = 3
         columnsStepper.maxValue = 7
         columnsStepper.increment = 1
         columnsStepper.target = self
         columnsStepper.action = #selector(columnsChanged(_:))
         root.addSubview(columnsStepper)
-        columnsValue.frame = CGRect(x: 258, y: 138, width: 26, height: 18)
+        columnsValue.frame = CGRect(x: 274, y: 152, width: 28, height: 18)
         columnsValue.alignment = .right
         columnsValue.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         root.addSubview(columnsValue)
 
-        addLabel("面板尺寸", frame: CGRect(x: 16, y: 172, width: 268, height: 14), font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
-        sizeControl.frame = CGRect(x: 16, y: 192, width: 268, height: 24)
+        addLabel("面板尺寸", frame: CGRect(x: 18, y: 190, width: 284, height: 16), font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
+        sizeControl.frame = CGRect(x: 18, y: 212, width: 284, height: 26)
+        sizeControl.controlSize = .small
         sizeControl.target = self
         sizeControl.action = #selector(sizeChanged(_:))
         root.addSubview(sizeControl)
 
-        addLabel("窗口层级", frame: CGRect(x: 16, y: 226, width: 268, height: 14), font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
-        levelControl.frame = CGRect(x: 16, y: 246, width: 268, height: 24)
+        addLabel("窗口层级", frame: CGRect(x: 18, y: 252, width: 284, height: 16), font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
+        levelControl.frame = CGRect(x: 18, y: 274, width: 284, height: 26)
+        levelControl.controlSize = .small
         levelControl.target = self
         levelControl.action = #selector(levelChanged(_:))
         root.addSubview(levelControl)
 
-        lockCheckbox.frame = CGRect(x: 16, y: 274, width: 268, height: 18)
-        lockCheckbox.font = .systemFont(ofSize: 11)
+        lockCheckbox.frame = CGRect(x: 18, y: 310, width: 284, height: 20)
+        lockCheckbox.controlSize = .small
+        lockCheckbox.font = .systemFont(ofSize: 12)
         lockCheckbox.target = self
         lockCheckbox.action = #selector(lockChanged(_:))
         root.addSubview(lockCheckbox)
 
-        let separator = NSBox(frame: CGRect(x: 16, y: 300, width: 268, height: 1))
+        let separator = NSBox(frame: CGRect(x: 18, y: 340, width: 284, height: 1))
         separator.boxType = .separator
         root.addSubview(separator)
 
         let clearButton = NSButton(title: "清空失效条目", target: self, action: #selector(clearMissing))
-        clearButton.frame = CGRect(x: 16, y: 320, width: 120, height: 24)
+        clearButton.frame = CGRect(x: 18, y: 346, width: 128, height: 24)
+        clearButton.controlSize = .small
         clearButton.bezelStyle = .rounded
         clearButton.font = .systemFont(ofSize: 11)
         root.addSubview(clearButton)
 
         deleteButton.target = self
         deleteButton.action = #selector(deletePanel)
-        deleteButton.frame = CGRect(x: 190, y: 320, width: 94, height: 24)
+        deleteButton.frame = CGRect(x: 208, y: 346, width: 94, height: 24)
+        deleteButton.controlSize = .small
         deleteButton.bezelStyle = .rounded
         deleteButton.font = .systemFont(ofSize: 11)
         root.addSubview(deleteButton)
@@ -144,7 +156,7 @@ final class SettingsViewController: NSViewController {
     }
 
     private func update(_ config: PanelConfig) {
-        colorWell.color = NSColor(hex: config.backgroundHex)
+        colorWell.color = PanelAppearance.customTint(for: config.backgroundHex) ?? NSColor.windowBackgroundColor
         opacitySlider.doubleValue = config.opacity
         opacityValue.stringValue = "\(Int(config.opacity * 100))%"
         columnsStepper.integerValue = config.columns
@@ -155,11 +167,13 @@ final class SettingsViewController: NSViewController {
         deleteButton.isEnabled = appStore.canDeletePanel
 
         for (index, button) in swatches.enumerated() {
+            let swatchColor = index == 0 ? NSColor.windowBackgroundColor : NSColor(hex: presets[index])
+            button.layer?.backgroundColor = swatchColor.cgColor
             let selected = presets[index].caseInsensitiveCompare(config.backgroundHex) == .orderedSame
             button.layer?.borderWidth = selected ? 2 : 1
             button.layer?.borderColor = selected
-                ? NSColor.labelColor.cgColor
-                : NSColor.labelColor.withAlphaComponent(0.15).cgColor
+                ? NSColor.controlAccentColor.cgColor
+                : NSColor.separatorColor.withAlphaComponent(0.7).cgColor
         }
     }
 
@@ -222,5 +236,12 @@ final class SettingsViewController: NSViewController {
 }
 
 final class FlippedView: NSView {
+    var onAppearanceChanged: (() -> Void)?
+
     override var isFlipped: Bool { true }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        onAppearanceChanged?()
+    }
 }

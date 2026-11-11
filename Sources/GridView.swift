@@ -5,7 +5,7 @@ final class GridView: NSView {
     weak var panelView: PanelView?
     private(set) var itemViews: [ItemView] = []
     private var addTile: AddTileView?
-    private var labelColor: NSColor = .white
+    private var labelColor: NSColor = PanelAppearance.primaryText
 
     var onAddRequested: (() -> Void)?
 
@@ -60,9 +60,9 @@ final class GridView: NSView {
 
         let columns = max(1, store.config.columns)
         let spacingX: CGFloat = 8
-        let spacingY: CGFloat = 4
+        let spacingY: CGFloat = 6
         let cellWidth = max(1, (width - spacingX * CGFloat(columns - 1)) / CGFloat(columns))
-        let cellHeight: CGFloat = 72
+        let cellHeight: CGFloat = 76
 
         var views: [NSView] = itemViews
         if let addTile {
@@ -101,9 +101,9 @@ final class GridView: NSView {
 
         let columns = max(1, store.config.columns)
         let spacingX: CGFloat = 8
-        let spacingY: CGFloat = 4
+        let spacingY: CGFloat = 6
         let cellWidth = max(1, (bounds.width - spacingX * CGFloat(columns - 1)) / CGFloat(columns))
-        let cellHeight: CGFloat = 72
+        let cellHeight: CGFloat = 76
 
         let column = max(0, min(columns - 1, Int((point.x + spacingX / 2) / (cellWidth + spacingX))))
         let row = max(0, Int((point.y + spacingY / 2) / (cellHeight + spacingY)))

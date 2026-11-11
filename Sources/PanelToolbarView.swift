@@ -13,7 +13,7 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
     private var isHovering = false
     private var forceVisible = false
     private var searchVisible = false
-    private var tintColor: NSColor = .white
+    private var tintColor: NSColor = PanelAppearance.secondaryText
 
     override var isFlipped: Bool { true }
 
@@ -26,10 +26,11 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
 
         searchField.delegate = self
         searchField.placeholderString = "搜索文件"
-        searchField.font = .systemFont(ofSize: 11)
-        searchField.isBordered = false
-        searchField.drawsBackground = false
-        searchField.focusRingType = .none
+        searchField.font = .systemFont(ofSize: 12)
+        searchField.isBordered = true
+        searchField.bezelStyle = .roundedBezel
+        searchField.drawsBackground = true
+        searchField.controlSize = .small
         searchField.sendsSearchStringImmediately = true
         searchField.isHidden = true
         addSubview(searchField)
@@ -98,9 +99,9 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
     private func configureButton(_ button: NSButton, symbol: String, tooltip: String, action: Selector) {
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)
         button.imagePosition = .imageOnly
-        button.isBordered = false
-        button.bezelStyle = .inline
-        button.focusRingType = .none
+        button.isBordered = true
+        button.bezelStyle = .toolbar
+        button.controlSize = .small
         button.toolTip = tooltip
         button.target = self
         button.action = action

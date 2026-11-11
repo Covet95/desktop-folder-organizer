@@ -6,8 +6,8 @@ final class PanelEmptyStateView: NSView {
     private let iconView = NSImageView(frame: .zero)
     private let messageLabel = NSTextField(labelWithString: "")
     private let actionButton = NSButton(title: "", target: nil, action: nil)
-    private var primaryColor: NSColor = .white
-    private var secondaryColor: NSColor = .white
+    private var primaryColor: NSColor = PanelAppearance.primaryText
+    private var secondaryColor: NSColor = PanelAppearance.secondaryText
     private var isSearching = false
 
     override var isFlipped: Bool { true }
@@ -24,10 +24,12 @@ final class PanelEmptyStateView: NSView {
         messageLabel.isSelectable = false
         messageLabel.isBezeled = false
         messageLabel.drawsBackground = false
-        messageLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        messageLabel.font = .systemFont(ofSize: 12, weight: .medium)
         addSubview(messageLabel)
 
         actionButton.isBordered = false
+        actionButton.bezelStyle = .inline
+        actionButton.controlSize = .small
         actionButton.target = self
         actionButton.action = #selector(didTapAction)
         addSubview(actionButton)
@@ -58,8 +60,8 @@ final class PanelEmptyStateView: NSView {
         actionButton.attributedTitle = NSAttributedString(
             string: actionButton.title,
             attributes: [
-                .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-                .foregroundColor: primaryColor
+                .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+                .foregroundColor: NSColor.controlAccentColor
             ]
         )
         needsLayout = true

@@ -25,21 +25,21 @@ final class ItemView: NSView, NSDraggingSource {
         super.init(frame: .zero)
 
         wantsLayer = true
-        layer?.cornerRadius = 7
+        layer?.cornerRadius = 9
         layer?.cornerCurve = .continuous
 
         iconView.image = IconProvider.shared.icon(for: item)
         iconView.imageScaling = .scaleProportionallyUpOrDown
-        iconView.contentTintColor = item.exists ? nil : labelColor
+        iconView.contentTintColor = item.exists ? nil : PanelAppearance.tertiaryText
         iconView.toolTip = item.name
         addSubview(iconView)
 
-        label.font = .systemFont(ofSize: 10)
+        label.font = .systemFont(ofSize: 11)
         label.alignment = .center
         label.maximumNumberOfLines = 2
         label.lineBreakMode = .byTruncatingTail
         label.isSelectable = false
-        label.textColor = item.exists ? labelColor : labelColor.withAlphaComponent(0.35)
+        label.textColor = item.exists ? labelColor : PanelAppearance.tertiaryText
         label.toolTip = item.name
         addSubview(label)
 
@@ -53,14 +53,14 @@ final class ItemView: NSView, NSDraggingSource {
 
     override func layout() {
         super.layout()
-        iconView.frame = CGRect(x: (bounds.width - 38) / 2, y: 4, width: 38, height: 38)
-        label.frame = CGRect(x: 2, y: 44, width: max(0, bounds.width - 4), height: 26)
+        iconView.frame = CGRect(x: (bounds.width - 40) / 2, y: 3, width: 40, height: 40)
+        label.frame = CGRect(x: 2, y: 47, width: max(0, bounds.width - 4), height: 27)
     }
 
     func setLabelColor(_ color: NSColor) {
         labelColor = color
-        label.textColor = item.exists ? color : color.withAlphaComponent(0.35)
-        iconView.contentTintColor = item.exists ? nil : color
+        label.textColor = item.exists ? color : PanelAppearance.tertiaryText
+        iconView.contentTintColor = item.exists ? nil : PanelAppearance.tertiaryText
         updateBackground()
     }
 
@@ -71,9 +71,9 @@ final class ItemView: NSView, NSDraggingSource {
 
     private func updateBackground() {
         if isDropTarget {
-            layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.22).cgColor
+            layer?.backgroundColor = PanelAppearance.itemDrop.cgColor
         } else if isHovering {
-            layer?.backgroundColor = labelColor.withAlphaComponent(0.10).cgColor
+            layer?.backgroundColor = PanelAppearance.itemHover.cgColor
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
         }

@@ -35,8 +35,8 @@ final class PanelView: NSView, NSPopoverDelegate {
     private var refreshScheduled = false
     private var trackingArea: NSTrackingArea?
     private var lastConfig: PanelConfig?
-    private var primaryColor: NSColor = .white
-    private var secondaryColor: NSColor = .white
+    private var primaryColor: NSColor = PanelAppearance.primaryText
+    private var secondaryColor: NSColor = PanelAppearance.secondaryText
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -52,7 +52,7 @@ final class PanelView: NSView, NSPopoverDelegate {
         layer?.cornerCurve = .continuous
 
         effectView.blendingMode = .behindWindow
-        effectView.material = .underWindowBackground
+        effectView.material = PanelAppearance.material
         effectView.state = .active
         effectView.autoresizingMask = [.width, .height]
         effectView.wantsLayer = true
@@ -185,16 +185,15 @@ final class PanelView: NSView, NSPopoverDelegate {
         let previous = lastConfig
         lastConfig = config
 
-        let base = NSColor(hex: config.backgroundHex)
-        let isLight = base.perceivedLuminance > 0.6
-        primaryColor = isLight ? NSColor.black.withAlphaComponent(0.82) : NSColor.white.withAlphaComponent(0.92)
-        secondaryColor = isLight ? NSColor.black.withAlphaComponent(0.48) : NSColor.white.withAlphaComponent(0.58)
+        primaryColor = PanelAppearance.primaryText
+        secondaryColor = PanelAppearance.secondaryText
 
-        effectView.material = isLight ? .underWindowBackground : .hudWindow
-        let tintAlpha = isLight
-            ? 0.08 + config.opacity * 0.22
-            : 0.30 + config.opacity * 0.35
-        tintView.layer?.backgroundColor = base.withAlphaComponent(tintAlpha).cgColor
+        effectView.material = PanelAppearance.material
+        effectView.alphaValue = PanelAppearance.materialOpacity(config.opacity)
+        let tint = PanelAppearance.customTint(for: config.backgroundHex)
+        tintView.layer?.backgroundColor = tint?
+            .withAlphaComponent(PanelAppearance.tintOpacity(config.opacity)).cgColor
+            ?? NSColor.clear.cgColor
         tintView.layer?.cornerRadius = config.cornerRadius
         tintView.layer?.cornerCurve = .continuous
         tintView.layer?.masksToBounds = true
@@ -206,7 +205,7 @@ final class PanelView: NSView, NSPopoverDelegate {
         layer?.cornerRadius = config.cornerRadius
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
-        layer?.borderColor = primaryColor.withAlphaComponent(0.12).cgColor
+        layer?.borderColor = PanelAppearance.border.cgColor
 
         toolbarView.setTintColor(secondaryColor)
         emptyStateView.update(
@@ -258,6 +257,11 @@ final class PanelView: NSView, NSPopoverDelegate {
         )
     }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        configChanged(store.config)
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let trackingArea {
@@ -307,7 +311,7 @@ final class PanelView: NSView, NSPopoverDelegate {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
-        secondaryColor.withAlphaComponent(0.5).setFill()
+        PanelAppearance.tertiaryText.withAlphaComponent(0.72).setFill()
         let startX: CGFloat = 14
         let startY: CGFloat = 17
         for row in 0..<3 {
@@ -441,8 +445,8 @@ final class PanelView: NSView, NSPopoverDelegate {
     private func setDropHighlight(_ active: Bool) {
         layer?.borderWidth = active ? 2 : 1
         layer?.borderColor = active
-            ? NSColor.controlAccentColor.cgColor
-            : primaryColor.withAlphaComponent(0.12).cgColor
+            ? NSColor.controlAccentColor.withAlphaComponent(0.85).cgColor
+            : PanelAppearance.border.cgColor
     }
 }
 
