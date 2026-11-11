@@ -2,9 +2,9 @@ import Foundation
 import CoreGraphics
 
 enum PanelDefaults {
-    static let minimumMaterialOpacity = 0.18
+    static let minimumMaterialOpacity = 0.08
     static let maximumMaterialOpacity = 0.85
-    static let materialOpacity = 0.38
+    static let materialOpacity = 0.22
 
     static func normalizedMaterialOpacity(_ value: Double) -> Double {
         guard value.isFinite,

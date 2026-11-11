@@ -16,7 +16,7 @@ enum PanelAppearance {
     static var tertiaryText: NSColor { .tertiaryLabelColor }
 
     // Neutral semantic chrome adapts to the system appearance.
-    static var border: NSColor { NSColor.separatorColor.withAlphaComponent(0.26) }
+    static var border: NSColor { NSColor.separatorColor.withAlphaComponent(0.14) }
     static var controlFill: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.12) }
 
     static var itemHover: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.18) }

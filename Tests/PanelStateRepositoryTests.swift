@@ -54,7 +54,7 @@ struct PanelStateRepositoryTests {
         }
 
         var legacyOpacityPanel = panel
-        legacyOpacityPanel.opacity = 0.14
+        legacyOpacityPanel.opacity = 0.04
         let legacyOpacityDirectory = root.appendingPathComponent("LegacyOpacity", isDirectory: true)
         let legacyOpacityRepository = JSONPanelStateRepository(directory: legacyOpacityDirectory)
         try! legacyOpacityRepository.save([legacyOpacityPanel])
