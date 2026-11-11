@@ -20,7 +20,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: "文档整理")
             button.image?.size = NSSize(width: 17, height: 17)
-            button.toolTip = "文档整理 · 自动监控中"
+            button.toolTip = "文档整理 · 自动收纳已开启"
         }
 
         let menu = NSMenu()
@@ -28,7 +28,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(menuItem("新建文档面板", action: #selector(newPanel), key: "n"))
         menu.addItem(menuItem("打开存储目录", action: #selector(openStorageDirectory), key: ""))
 
-        let status = menuItem("自动监控中", action: #selector(showFileActivity), key: "")
+        let status = menuItem("自动收纳已开启", action: #selector(showFileActivity), key: "")
         status.isEnabled = false
         menu.addItem(status)
         statusMenuItem = status

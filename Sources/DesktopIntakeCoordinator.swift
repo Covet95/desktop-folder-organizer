@@ -52,7 +52,7 @@ final class DesktopIntakeCoordinator {
         }
 
         if appStore.autoAbsorbStatus.phase != .attention {
-            appStore.updateAutoAbsorbStatus(phase: .monitoring, message: "正在监控桌面")
+            appStore.updateAutoAbsorbStatus(phase: .monitoring, message: "自动收纳已开启，等待桌面文件变化")
         }
         if let warning = appStore.fileOperations.first(where: { $0.state == .needsAttention })?.errorMessage {
             let count = appStore.fileOperations.filter { $0.state == .needsAttention }.count
@@ -137,8 +137,8 @@ final class DesktopIntakeCoordinator {
                 self.appStore.updateAutoAbsorbStatus(
                     phase: .monitoring,
                     message: movedCount > 0
-                        ? "已自动收纳 \(movedCount) 个项目，继续监控桌面"
-                        : "桌面监控正常"
+                        ? "已自动收纳 \(movedCount) 个项目，自动收纳已开启"
+                        : "自动收纳已开启，等待桌面文件变化"
                 )
             }
 

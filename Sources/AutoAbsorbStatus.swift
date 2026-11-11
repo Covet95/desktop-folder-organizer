@@ -8,7 +8,7 @@ enum AutoAbsorbPhase: String, Equatable {
 
     var title: String {
         switch self {
-        case .monitoring: return "自动监控中"
+        case .monitoring: return "自动收纳已开启"
         case .processing: return "正在收纳"
         case .retrying: return "等待重试"
         case .attention: return "需要处理"
@@ -19,7 +19,7 @@ enum AutoAbsorbPhase: String, Equatable {
 struct AutoAbsorbStatus: Equatable {
     var phase: AutoAbsorbPhase = .monitoring
     var pendingCount: Int = 0
-    var message: String = "正在监控桌面"
+    var message: String = "等待桌面文件变化"
     var updatedAt: Date = Date()
 
     var detail: String {
