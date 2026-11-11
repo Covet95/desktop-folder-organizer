@@ -2,8 +2,6 @@ import Foundation
 import CoreGraphics
 
 enum PanelDefaults {
-    // Legacy persisted value only. The panel no longer applies a custom color tint.
-    static let legacyBackgroundHex = "#FFFFFF"
     static let minimumMaterialOpacity = 0.18
     static let maximumMaterialOpacity = 0.85
     static let materialOpacity = 0.38
@@ -107,8 +105,6 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     var id: UUID
     var frame: PanelFrame
     var items: [WidgetItem]
-    // Retained to decode existing panels.json files; never used to tint the panel.
-    var backgroundHex: String
     var opacity: Double
     var columns: Int
     var levelMode: PanelLevelMode
@@ -120,7 +116,6 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         id: UUID = UUID(),
         frame: PanelFrame = .default,
         items: [WidgetItem] = [],
-        backgroundHex: String = PanelDefaults.legacyBackgroundHex,
         opacity: Double = PanelDefaults.materialOpacity,
         columns: Int = 5,
         levelMode: PanelLevelMode = .desktop,
@@ -131,7 +126,6 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         self.id = id
         self.frame = frame
         self.items = items
-        self.backgroundHex = backgroundHex
         self.opacity = opacity
         self.columns = columns
         self.levelMode = levelMode

@@ -7,7 +7,6 @@ mkdir -p build
 swiftc -swift-version 5 -parse-as-library \
     Sources/Models.swift \
     Sources/PanelAppearance.swift \
-    Sources/ColorHex.swift \
     Sources/PanelStateRepository.swift \
     Sources/FileOperationJournal.swift \
     Sources/FileOperationService.swift \

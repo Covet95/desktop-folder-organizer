@@ -170,6 +170,11 @@ struct StoreTests {
         let lockedData = try! JSONEncoder().encode(legacy)
         let lockedDecoded = try! JSONDecoder().decode(PanelConfig.self, from: lockedData)
         expect(lockedDecoded.positionLocked, "position lock persists")
+        let encodedLegacyObject = try! JSONSerialization.jsonObject(with: lockedData) as! [String: Any]
+        expect(
+            encodedLegacyObject["backgroundHex"] == nil,
+            "legacy background color is ignored and omitted from new state"
+        )
 
         let moveStore = PanelStore(config: .makeDefault(index: 0))
         moveStore.add(urls: [report, budget, projectFolder])
