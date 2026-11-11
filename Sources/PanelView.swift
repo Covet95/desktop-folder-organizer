@@ -200,12 +200,15 @@ final class PanelView: NSView, NSPopoverDelegate {
         secondaryColor = PanelAppearance.secondaryText
 
         effectView.material = PanelAppearance.material(for: config.levelMode)
-        // Never fade the NSVisualEffectView itself: doing so weakens the native blur
-        // and wallpaper sampling. The user control only changes the independent tint.
-        effectView.alphaValue = 1
+        // Material opacity controls how much desktop wallpaper comes through.
+        // The independent tint wash stays subtle and never fades the file content.
+        effectView.alphaValue = CGFloat(
+            min(max(config.opacity, PanelAppearance.minimumMaterialOpacity),
+                PanelAppearance.maximumMaterialOpacity)
+        )
         let tint = PanelAppearance.customTint(for: config.backgroundHex)
         tintView.layer?.backgroundColor = tint
-            .withAlphaComponent(PanelAppearance.tintOpacity(config.opacity)).cgColor
+            .withAlphaComponent(PanelAppearance.tintOpacity).cgColor
         tintView.layer?.cornerRadius = config.cornerRadius
         tintView.layer?.cornerCurve = .continuous
         tintView.layer?.masksToBounds = true
@@ -217,9 +220,9 @@ final class PanelView: NSView, NSPopoverDelegate {
         layer?.cornerRadius = config.cornerRadius
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
-        layer?.borderColor = PanelAppearance.border.cgColor
+        layer?.borderColor = PanelAppearance.border(for: config.backgroundHex).cgColor
 
-        toolbarView.setTintColor(secondaryColor)
+        toolbarView.setTintColor(secondaryColor, backgroundHex: config.backgroundHex)
         emptyStateView.update(
             searching: isSearchActive,
             primaryColor: primaryColor,
@@ -323,7 +326,15 @@ final class PanelView: NSView, NSPopoverDelegate {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
-        PanelAppearance.tertiaryText.withAlphaComponent(0.72).setFill()
+        // A restrained top-edge glint gives the glass a native layered edge without a solid outline.
+        let highlight = NSBezierPath()
+        highlight.move(to: CGPoint(x: store.config.cornerRadius, y: 0.7))
+        highlight.line(to: CGPoint(x: bounds.width - store.config.cornerRadius, y: 0.7))
+        NSColor.white.withAlphaComponent(0.16).setStroke()
+        highlight.lineWidth = 0.8
+        highlight.stroke()
+
+        PanelAppearance.tertiaryText.withAlphaComponent(0.62).setFill()
         let startX: CGFloat = 14
         let startY: CGFloat = 17
         for row in 0..<3 {
@@ -458,8 +469,8 @@ final class PanelView: NSView, NSPopoverDelegate {
     private func setDropHighlight(_ active: Bool) {
         layer?.borderWidth = active ? 2 : 1
         layer?.borderColor = active
-            ? NSColor.controlAccentColor.withAlphaComponent(0.85).cgColor
-            : PanelAppearance.border.cgColor
+            ? NSColor.controlAccentColor.withAlphaComponent(0.72).cgColor
+            : PanelAppearance.border(for: store.config.backgroundHex).cgColor
     }
 }
 

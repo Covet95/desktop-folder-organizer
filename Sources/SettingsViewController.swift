@@ -6,12 +6,12 @@ final class SettingsViewController: NSViewController {
     private let appStore: AppStore
     var onDelete: (() -> Void)?
 
-    private let presets = [PanelAppearance.defaultTintHex, "#0F5B59", "#454071", "#5A4638", "#2F4A61", "#41464E"]
+    private let presets = [PanelAppearance.defaultTintHex, "#147F7A", "#6359A6", "#9A6B48", "#416B91", "#59616C"]
     private let sizes: [(Double, Double)] = [(330, 300), (390, 360), (480, 440)]
     private var swatches: [NSButton] = []
     private let colorWell = NSColorWell(frame: .zero)
     private let sizeControl = NSSegmentedControl(labels: ["小", "中", "大"], trackingMode: .selectOne, target: nil, action: nil)
-    private let opacitySlider = NSSlider(value: 0.92, minValue: 0.4, maxValue: 1.0, target: nil, action: nil)
+    private let opacitySlider = NSSlider(value: PanelAppearance.defaultMaterialOpacity, minValue: PanelAppearance.minimumMaterialOpacity, maxValue: PanelAppearance.maximumMaterialOpacity, target: nil, action: nil)
     private let opacityValue = NSTextField(labelWithString: "")
     private let columnsValue = NSTextField(labelWithString: "")
     private let columnsStepper = NSStepper(frame: .zero)
@@ -63,9 +63,10 @@ final class SettingsViewController: NSViewController {
         colorWell.action = #selector(colorWellChanged(_:))
         root.addSubview(colorWell)
 
-        addLabel("背景色调强度", frame: CGRect(x: 18, y: 116, width: 76, height: 18), font: .systemFont(ofSize: 12))
+        addLabel("材质不透明度", frame: CGRect(x: 18, y: 116, width: 82, height: 18), font: .systemFont(ofSize: 12))
         opacitySlider.frame = CGRect(x: 102, y: 114, width: 156, height: 20)
         opacitySlider.controlSize = .small
+        opacitySlider.toolTip = "数值越低，面板越透明；文件图标和文字保持清晰"
         opacitySlider.target = self
         opacitySlider.action = #selector(opacityChanged(_:))
         root.addSubview(opacitySlider)

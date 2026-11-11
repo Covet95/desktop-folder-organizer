@@ -53,6 +53,34 @@ struct PanelStateRepositoryTests {
             expect(false, "valid panel state round-trips")
         }
 
+        var legacyOpacityPanel = panel
+        legacyOpacityPanel.opacity = 0.14
+        let legacyOpacityDirectory = root.appendingPathComponent("LegacyOpacity", isDirectory: true)
+        let legacyOpacityRepository = JSONPanelStateRepository(directory: legacyOpacityDirectory)
+        try! legacyOpacityRepository.save([legacyOpacityPanel])
+        if case .loaded(let panels) = legacyOpacityRepository.load() {
+            expect(
+                panels.first?.opacity == PanelDefaults.materialOpacity,
+                "legacy out-of-range material opacity is normalized to the translucent default"
+            )
+        } else {
+            expect(false, "legacy out-of-range material opacity is normalized to the translucent default")
+        }
+
+        var userOpacityPanel = panel
+        userOpacityPanel.opacity = 0.40
+        let userOpacityDirectory = root.appendingPathComponent("UserOpacity", isDirectory: true)
+        let userOpacityRepository = JSONPanelStateRepository(directory: userOpacityDirectory)
+        try! userOpacityRepository.save([userOpacityPanel])
+        if case .loaded(let panels) = userOpacityRepository.load() {
+            expect(
+                panels.first?.opacity == 0.40,
+                "a valid user-selected material opacity is preserved"
+            )
+        } else {
+            expect(false, "a valid user-selected material opacity is preserved")
+        }
+
         let corruptDirectory = root.appendingPathComponent("Corrupt", isDirectory: true)
         try! fileManager.createDirectory(at: corruptDirectory, withIntermediateDirectories: true)
         let corruptURL = corruptDirectory.appendingPathComponent("panels.json")

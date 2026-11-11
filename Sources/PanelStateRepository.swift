@@ -71,7 +71,12 @@ final class JSONPanelStateRepository: PanelStateRepository {
             return .recoveryRequired(reason)
         }
 
-        return .loaded(state.panels)
+        let normalizedPanels = state.panels.map { panel -> PanelConfig in
+            var normalized = panel
+            normalized.opacity = PanelDefaults.normalizedMaterialOpacity(panel.opacity)
+            return normalized
+        }
+        return .loaded(normalizedPanels)
     }
 
     func save(_ panels: [PanelConfig]) throws {

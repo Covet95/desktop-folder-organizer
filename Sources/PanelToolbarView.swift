@@ -13,7 +13,6 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
     private var isHovering = false
     private var forceVisible = false
     private var searchVisible = false
-    private var tintColor: NSColor = PanelAppearance.secondaryText
 
     override var isFlipped: Bool { true }
 
@@ -27,9 +26,10 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
         searchField.delegate = self
         searchField.placeholderString = "搜索文件"
         searchField.font = .systemFont(ofSize: 12)
-        searchField.isBordered = true
+        searchField.isBordered = false
         searchField.bezelStyle = .roundedBezel
         searchField.drawsBackground = true
+        searchField.focusRingType = .none
         searchField.controlSize = .small
         searchField.sendsSearchStringImmediately = true
         searchField.isHidden = true
@@ -41,12 +41,12 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func setTintColor(_ color: NSColor) {
-        tintColor = color
+    func setTintColor(_ color: NSColor, backgroundHex: String) {
         for button in [searchButton, addButton, settingsButton] {
             button.contentTintColor = color
         }
-        searchField.textColor = color
+        searchField.textColor = PanelAppearance.primaryText
+        searchField.backgroundColor = PanelAppearance.controlFill(for: backgroundHex)
     }
 
     func setHovering(_ hovering: Bool) {

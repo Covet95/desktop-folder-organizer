@@ -1,6 +1,21 @@
 import Foundation
 import CoreGraphics
 
+enum PanelDefaults {
+    static let backgroundHex = "#0E76B7"
+    static let minimumMaterialOpacity = 0.25
+    static let maximumMaterialOpacity = 0.85
+    static let materialOpacity = 0.55
+
+    static func normalizedMaterialOpacity(_ value: Double) -> Double {
+        guard value.isFinite,
+              value >= minimumMaterialOpacity,
+              value <= maximumMaterialOpacity
+        else { return materialOpacity }
+        return value
+    }
+}
+
 struct PanelFrame: Codable, Equatable {
     var x: Double
     var y: Double
@@ -103,8 +118,8 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         id: UUID = UUID(),
         frame: PanelFrame = .default,
         items: [WidgetItem] = [],
-        backgroundHex: String = PanelAppearance.defaultTintHex,
-        opacity: Double = 0.92,
+        backgroundHex: String = PanelDefaults.backgroundHex,
+        opacity: Double = PanelDefaults.materialOpacity,
         columns: Int = 5,
         levelMode: PanelLevelMode = .desktop,
         isHidden: Bool = false,

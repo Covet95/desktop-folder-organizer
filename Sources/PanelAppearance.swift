@@ -1,15 +1,15 @@
 import AppKit
 
 enum PanelAppearance {
-    static let defaultTintHex = "#034373"
+    static let defaultTintHex = PanelDefaults.backgroundHex
     private static let lightAppearance = NSAppearance(named: .aqua)!
     private static let darkAppearance = NSAppearance(named: .darkAqua)!
 
     static func material(for level: PanelLevelMode) -> NSVisualEffectView.Material {
         switch level {
         case .desktop:
-            // A dark, wallpaper-sampling glass surface better matches the desktop widget treatment.
-            return .hudWindow
+            // Desktop widgets should sample and blur the wallpaper rather than paint a solid HUD surface.
+            return .underWindowBackground
         case .floating:
             return .popover
         }
@@ -25,14 +25,23 @@ enum PanelAppearance {
     static var primaryText: NSColor { .labelColor }
     static var secondaryText: NSColor { .secondaryLabelColor }
     static var tertiaryText: NSColor { .tertiaryLabelColor }
-    static var border: NSColor { NSColor.separatorColor.withAlphaComponent(0.42) }
-    static var itemHover: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.24) }
-    static var itemDrop: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.16) }
-
-    static func tintOpacity(_ value: Double) -> CGFloat {
-        // Preserve a rich tinted-glass surface while leaving the underlying blur visible.
-        CGFloat(0.55 + min(max(value, 0.4), 1) * 0.25)
+    static func border(for hex: String) -> NSColor {
+        let isDark = NSColor(hex: hex).perceivedLuminance < 0.52
+        return (isDark ? NSColor.white : NSColor.black).withAlphaComponent(0.18)
     }
+
+    static func controlFill(for hex: String) -> NSColor {
+        let isDark = NSColor(hex: hex).perceivedLuminance < 0.52
+        return (isDark ? NSColor.white : NSColor.black).withAlphaComponent(0.085)
+    }
+
+    static var itemHover: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.18) }
+    static var itemDrop: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.18) }
+
+    static let minimumMaterialOpacity = PanelDefaults.minimumMaterialOpacity
+    static let maximumMaterialOpacity = PanelDefaults.maximumMaterialOpacity
+    static let defaultMaterialOpacity = PanelDefaults.materialOpacity
+    static let tintOpacity: CGFloat = 0.12
 
     static func customTint(for hex: String) -> NSColor {
         NSColor(hex: hex)
