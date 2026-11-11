@@ -619,13 +619,6 @@ struct StoreTests {
             watched.append(contentsOf: urls)
             finish(Set(urls.map(DesktopWatcher.pathKey)))
         }
-        expect(
-            watcher.initialItems.contains {
-                $0.standardizedFileURL.path == preexisting.standardizedFileURL.path
-            },
-            "watcher snapshots existing files"
-        )
-
         let startupDeadline = Date().addingTimeInterval(6)
         while !watched.contains(where: { $0.lastPathComponent == "已有文件.txt" }),
               Date() < startupDeadline {
@@ -788,7 +781,6 @@ struct StoreTests {
             lateItemDetected = urls.contains { $0.lastPathComponent == "延迟创建桌面中的文件.txt" }
             finish(Set(urls.map(DesktopWatcher.pathKey)))
         }
-        expect(lateWatcher.initialItems.isEmpty, "watcher can start before the desktop directory is readable")
         try! fileManager.createDirectory(at: lateDesktop, withIntermediateDirectories: true)
         let lateFile = lateDesktop.appendingPathComponent("延迟创建桌面中的文件.txt")
         fileManager.createFile(atPath: lateFile.path, contents: Data("late".utf8))

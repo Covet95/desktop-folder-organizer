@@ -32,7 +32,6 @@ final class DesktopIntakeCoordinator {
     private let appStore: AppStore
     private let desktopURL: URL?
     private var watcher: DesktopWatcher?
-    private var hasStarted = false
 
     init(
         appStore: AppStore,
@@ -43,8 +42,14 @@ final class DesktopIntakeCoordinator {
     }
 
     func start() {
-        guard !hasStarted else { return }
-        hasStarted = true
+        guard watcher == nil else { return }
+        guard let desktopURL else {
+            appStore.updateAutoAbsorbStatus(
+                phase: .attention,
+                message: "无法定位桌面目录，自动收纳未启动"
+            )
+            return
+        }
 
         if appStore.autoAbsorbStatus.phase != .attention {
             appStore.updateAutoAbsorbStatus(phase: .monitoring, message: "正在监控桌面")
@@ -62,7 +67,6 @@ final class DesktopIntakeCoordinator {
             self?.watcher?.markHandled(url)
         }
 
-        guard let desktopURL else { return }
         watcher = DesktopWatcher(desktopURL: desktopURL) { [weak self] urls, finish in
             guard let self else {
                 finish([])

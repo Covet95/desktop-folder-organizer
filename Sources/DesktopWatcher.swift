@@ -31,8 +31,6 @@ final class DesktopWatcher {
     private var lastScanError: String?
     private var isStopped = false
 
-    private(set) var initialItems: [URL]
-
     static func pathKey(_ url: URL) -> String {
         url.standardizedFileURL.resolvingSymlinksInPath().path
     }
@@ -47,11 +45,6 @@ final class DesktopWatcher {
     ) {
         self.desktopURL = desktopURL
         self.onStableItems = onNewItems
-        self.initialItems = (try? FileManager.default.contentsOfDirectory(
-            at: desktopURL,
-            includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        )) ?? []
 
         // Existing desktop items are intentionally not pre-marked as known:
         // they must pass the same stability checks as files created after launch.
