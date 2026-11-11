@@ -3,9 +3,9 @@ import Foundation
 
 final class DesktopWatcher {
     private static let temporaryExtensions: Set<String> = ["download", "crdownload", "part"]
-    // Three observations, separated by the candidate-only timer, provide two full quiet intervals.
-    private static let stabilityCheckCount = 3
-    private static let stabilityInterval: TimeInterval = 1
+    // A quiet period after the latest event keeps intake responsive without fixed polling.
+    private static let stabilityInterval: TimeInterval = 0.5
+    private static let eventLatency: TimeInterval = 0.1
     private static let retryBaseInterval: TimeInterval = 2
     private static let retryMaximumInterval: TimeInterval = 60
     private static let fallbackScanInterval: TimeInterval = 30
@@ -15,7 +15,7 @@ final class DesktopWatcher {
         var size: Int64
         var modifiedAt: Date?
         var resourceIdentifier: String?
-        var checks: Int
+        var lastActivityAt: Date
 
         func matches(_ other: FileStability) -> Bool {
             size == other.size
@@ -28,6 +28,7 @@ final class DesktopWatcher {
     private let onStableItems: ([URL], @escaping (Set<String>) -> Void) -> Void
     private var eventStream: FSEventStreamRef?
     private var stabilityTimer: DispatchSourceTimer?
+    private var stabilityTimerGeneration: UInt64 = 0
     private var fallbackTimer: DispatchSourceTimer?
     private var missingDesktopTimer: DispatchSourceTimer?
     private var known: [String: FileStability] = [:]
@@ -166,7 +167,7 @@ final class DesktopWatcher {
             &context,
             [desktopURL.path] as CFArray,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-            0.3,
+            Self.eventLatency,
             flags
         ) else {
             return false
@@ -217,7 +218,7 @@ final class DesktopWatcher {
         fallbackTimer = timer
     }
 
-    private func scanDesktop() {
+    private func scanDesktop(resetQuietPeriod: Bool = false) {
         guard !isStopped else { return }
 
         let items: [URL]
@@ -250,7 +251,7 @@ final class DesktopWatcher {
         removeMissingPaths(from: currentPaths)
 
         let readyItems = items.compactMap {
-            observe($0, countStableObservation: false)
+            observe($0, eventObserved: resetQuietPeriod)
         }
         submitStableItems(readyItems)
         updateStabilityTimer()
@@ -300,7 +301,7 @@ final class DesktopWatcher {
             return
         }
         if requiresFullScan {
-            scanDesktop()
+            scanDesktop(resetQuietPeriod: true)
             return
         }
 
@@ -308,7 +309,7 @@ final class DesktopWatcher {
             resetStability(for: URL(fileURLWithPath: path))
         }
         let readyItems = changedPaths.compactMap {
-            observe(URL(fileURLWithPath: $0), countStableObservation: false)
+            observe(URL(fileURLWithPath: $0), eventObserved: true)
         }
         submitStableItems(readyItems)
         updateStabilityTimer()
@@ -355,7 +356,7 @@ final class DesktopWatcher {
         pendingPaths.insert(path)
     }
 
-    private func observe(_ url: URL, countStableObservation: Bool) -> URL? {
+    private func observe(_ url: URL, eventObserved: Bool) -> URL? {
         guard !isStopped else { return nil }
         let path = Self.pathKey(url)
 
@@ -372,10 +373,6 @@ final class DesktopWatcher {
 
         if let previous = known[path] {
             if previous.matches(current) {
-                pendingPaths.remove(path)
-                fileStability.removeValue(forKey: path)
-                retryAttempts.removeValue(forKey: path)
-                retryAfter.removeValue(forKey: path)
                 return nil
             }
 
@@ -385,18 +382,21 @@ final class DesktopWatcher {
             return nil
         }
 
-        if var previous = fileStability[path], previous.matches(current) {
-            if countStableObservation {
-                previous.checks += 1
+        if var previous = fileStability[path] {
+            if !previous.matches(current) || eventObserved {
+                previous.size = current.size
+                previous.modifiedAt = current.modifiedAt
+                previous.resourceIdentifier = current.resourceIdentifier
+                previous.lastActivityAt = Date()
+                fileStability[path] = previous
             }
-            fileStability[path] = previous
         } else {
             fileStability[path] = current
         }
         pendingPaths.insert(path)
 
         guard let stability = fileStability[path],
-              stability.checks >= Self.stabilityCheckCount,
+              Date() >= stability.lastActivityAt.addingTimeInterval(Self.stabilityInterval),
               retryAfter[path].map({ Date() >= $0 }) ?? true
         else { return nil }
 
@@ -412,7 +412,7 @@ final class DesktopWatcher {
             size: Int64(values.fileSize ?? 0),
             modifiedAt: values.contentModificationDate,
             resourceIdentifier: values.fileResourceIdentifier.map { String(describing: $0) },
-            checks: 1
+            lastActivityAt: Date()
         )
     }
 
@@ -420,30 +420,46 @@ final class DesktopWatcher {
         guard !isStopped else { return }
         let paths = pendingPaths.subtracting(inFlight)
         let readyItems = paths.compactMap {
-            observe(URL(fileURLWithPath: $0), countStableObservation: true)
+            observe(URL(fileURLWithPath: $0), eventObserved: false)
         }
         submitStableItems(readyItems)
         updateStabilityTimer()
     }
 
+    private func cancelStabilityTimer() {
+        stabilityTimerGeneration &+= 1
+        stabilityTimer?.cancel()
+        stabilityTimer = nil
+    }
+
     private func updateStabilityTimer() {
         guard !isStopped else { return }
 
-        let hasPendingItems = !pendingPaths.subtracting(inFlight).isEmpty
-        guard hasPendingItems else {
-            stabilityTimer?.cancel()
-            stabilityTimer = nil
+        let nextDeadline = pendingPaths.subtracting(inFlight).compactMap { path -> Date? in
+            guard let stability = fileStability[path] else { return nil }
+            let quietDeadline = stability.lastActivityAt.addingTimeInterval(Self.stabilityInterval)
+            return max(quietDeadline, retryAfter[path] ?? .distantPast)
+        }.min()
+
+        guard let nextDeadline else {
+            cancelStabilityTimer()
             return
         }
 
-        guard stabilityTimer == nil else { return }
+        cancelStabilityTimer()
+        let generation = stabilityTimerGeneration
         let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(
-            deadline: .now() + Self.stabilityInterval,
-            repeating: Self.stabilityInterval
-        )
+        let delay = max(0.01, nextDeadline.timeIntervalSinceNow)
+        timer.schedule(deadline: .now() + delay, leeway: .milliseconds(50))
         timer.setEventHandler { [weak self] in
-            self?.checkPendingPaths()
+            guard let self,
+                  !self.isStopped,
+                  self.stabilityTimerGeneration == generation
+            else { return }
+
+            self.stabilityTimer?.cancel()
+            self.stabilityTimer = nil
+            self.checkPendingPaths()
         }
         timer.resume()
         stabilityTimer = timer

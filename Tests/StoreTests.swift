@@ -654,23 +654,23 @@ struct StoreTests {
 
         let growingFile = watchDesktop.appendingPathComponent("正在写入但没有临时后缀.txt")
         fileManager.createFile(atPath: growingFile.path, contents: Data("part".utf8))
-        let firstWriteDeadline = Date().addingTimeInterval(1.8)
+        let firstWriteDeadline = Date().addingTimeInterval(0.25)
         while Date() < firstWriteDeadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         }
         try! Data("completed-content".utf8).write(to: growingFile)
-        let postWriteDeadline = Date().addingTimeInterval(1.2)
+        let postWriteDeadline = Date().addingTimeInterval(0.25)
         while Date() < postWriteDeadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         }
         expect(
             !watched.contains { $0.lastPathComponent == "正在写入但没有临时后缀.txt" },
-            "watcher resets stability checks when a file changes during observation"
+            "watcher resets the quiet period when a file changes during observation"
         )
-        let growingStableDeadline = Date().addingTimeInterval(5)
+        let growingStableDeadline = Date().addingTimeInterval(3)
         while !watched.contains(where: { $0.lastPathComponent == "正在写入但没有临时后缀.txt" }),
               Date() < growingStableDeadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         }
         expect(
             watched.contains { $0.lastPathComponent == "正在写入但没有临时后缀.txt" },
