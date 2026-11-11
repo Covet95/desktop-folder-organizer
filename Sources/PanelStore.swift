@@ -31,6 +31,27 @@ final class PanelStore: ObservableObject, Identifiable {
         config.items.append(contentsOf: added)
     }
 
+    /// Keep managed folder items in sync while preserving manually added external references
+    /// and the order/identities of items that are still present.
+    func synchronizeManagedItems(_ urls: [URL], directory: URL) {
+        let root = directory.standardizedFileURL.path
+        let paths = Set(urls.map { $0.standardizedFileURL.path })
+        var items = config.items.filter { item in
+            let url = URL(fileURLWithPath: item.path).standardizedFileURL
+            return url.deletingLastPathComponent().path != root || paths.contains(url.path)
+        }
+        var seen = Set(items.map { URL(fileURLWithPath: $0.path).standardizedFileURL.path })
+        for url in urls.sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }) {
+            let path = url.standardizedFileURL.path
+            if seen.insert(path).inserted {
+                items.append(WidgetItem(path: path))
+            }
+        }
+        if items != config.items {
+            config.items = items
+        }
+    }
+
     func remove(id: UUID) {
         config.items.removeAll { $0.id == id }
     }

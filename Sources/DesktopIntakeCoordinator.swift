@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 struct DesktopIntakeBatch {
@@ -32,6 +33,7 @@ final class DesktopIntakeCoordinator {
     private let appStore: AppStore
     private let desktopURL: URL?
     private var watcher: DesktopWatcher?
+    private var storageMonitor: DispatchSourceFileSystemObject?
 
     init(
         appStore: AppStore,
@@ -43,6 +45,7 @@ final class DesktopIntakeCoordinator {
 
     func start() {
         guard watcher == nil else { return }
+        startStorageMonitoring()
         guard let desktopURL else {
             appStore.updateAutoAbsorbStatus(
                 phase: .attention,
@@ -79,7 +82,93 @@ final class DesktopIntakeCoordinator {
     func stop() {
         watcher?.stop()
         watcher = nil
+        storageMonitor?.cancel()
+        storageMonitor = nil
         appStore.onFileRestored = nil
+    }
+
+    private func startStorageMonitoring() {
+        guard storageMonitor == nil else { return }
+        let directory = appStore.storageDirectory
+
+        // Do not recreate a missing managed folder and erase its saved panel references.
+        if !FileManager.default.fileExists(atPath: directory.path),
+           appStore.panels.first?.config.items.contains(where: {
+               URL(fileURLWithPath: $0.path).standardizedFileURL
+                   .deletingLastPathComponent().path == directory.standardizedFileURL.path
+           }) == true {
+            appStore.updateAutoAbsorbStatus(
+                phase: .attention,
+                message: "原收纳目录不存在，请先恢复目录位置"
+            )
+            return
+        }
+
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            appStore.updateAutoAbsorbStatus(
+                phase: .attention,
+                message: "无法访问收纳目录：\(error.localizedDescription)"
+            )
+            return
+        }
+
+        // Reconcile existing items before watching new changes.
+        refreshStoredItems()
+        let descriptor = open(directory.path, O_EVTONLY)
+        guard descriptor >= 0 else {
+            appStore.updateAutoAbsorbStatus(
+                phase: .attention,
+                message: "无法监听收纳目录的文件变化"
+            )
+            return
+        }
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: descriptor,
+            eventMask: [.write, .rename, .delete, .revoke],
+            queue: .main
+        )
+        source.setEventHandler { [weak self] in
+            guard let self, let source = self.storageMonitor else { return }
+            if source.data.intersection([.rename, .delete, .revoke]) != [] {
+                source.cancel()
+                self.storageMonitor = nil
+                if FileManager.default.fileExists(atPath: directory.path) {
+                    self.startStorageMonitoring()
+                } else {
+                    self.appStore.updateAutoAbsorbStatus(
+                        phase: .attention,
+                        message: "收纳目录已移动或不可用，请检查目录位置"
+                    )
+                }
+                return
+            }
+            // Wait for internal move/rename/restore callbacks so their panel references
+            // are updated before reconciling directory changes.
+            self.appStore.drainFileOperations { [weak self] in
+                self?.refreshStoredItems()
+            }
+        }
+        source.setCancelHandler { close(descriptor) }
+        storageMonitor = source
+        source.resume()
+    }
+
+    private func refreshStoredItems() {
+        let directory = appStore.storageDirectory
+        let urls: [URL]
+        do {
+            urls = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
+        } catch {
+            NSLog("DesktopFolderWidget: cannot list storage directory: \(error)")
+            return
+        }
+        appStore.panels.first?.synchronizeManagedItems(urls, directory: directory)
     }
 
     private func absorbDesktopItems(
