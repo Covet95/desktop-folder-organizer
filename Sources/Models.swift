@@ -103,7 +103,7 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         id: UUID = UUID(),
         frame: PanelFrame = .default,
         items: [WidgetItem] = [],
-        backgroundHex: String = "#1C1C1E",
+        backgroundHex: String = PanelAppearance.defaultTintHex,
         opacity: Double = 0.92,
         columns: Int = 5,
         levelMode: PanelLevelMode = .desktop,

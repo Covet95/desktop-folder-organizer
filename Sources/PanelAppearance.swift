@@ -1,7 +1,26 @@
 import AppKit
 
 enum PanelAppearance {
-    static let material: NSVisualEffectView.Material = .popover
+    static let defaultTintHex = "#034373"
+    private static let lightAppearance = NSAppearance(named: .aqua)!
+    private static let darkAppearance = NSAppearance(named: .darkAqua)!
+
+    static func material(for level: PanelLevelMode) -> NSVisualEffectView.Material {
+        switch level {
+        case .desktop:
+            // A dark, wallpaper-sampling glass surface better matches the desktop widget treatment.
+            return .hudWindow
+        case .floating:
+            return .popover
+        }
+    }
+
+    static func appearance(for hex: String) -> NSAppearance {
+        let name: NSAppearance.Name = NSColor(hex: hex).perceivedLuminance < 0.52
+            ? .darkAqua
+            : .aqua
+        return name == .darkAqua ? darkAppearance : lightAppearance
+    }
 
     static var primaryText: NSColor { .labelColor }
     static var secondaryText: NSColor { .secondaryLabelColor }
@@ -10,17 +29,12 @@ enum PanelAppearance {
     static var itemHover: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.24) }
     static var itemDrop: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.16) }
 
-    static func materialOpacity(_ value: Double) -> CGFloat {
-        CGFloat(min(max(value, 0.4), 1))
-    }
-
     static func tintOpacity(_ value: Double) -> CGFloat {
-        CGFloat(0.035 + min(max(value, 0.4), 1) * 0.055)
+        // Preserve a rich tinted-glass surface while leaving the underlying blur visible.
+        CGFloat(0.55 + min(max(value, 0.4), 1) * 0.25)
     }
 
-    static func customTint(for hex: String) -> NSColor? {
-        // The original default color now means "follow the macOS material".
-        guard hex.caseInsensitiveCompare("#1C1C1E") != .orderedSame else { return nil }
-        return NSColor(hex: hex)
+    static func customTint(for hex: String) -> NSColor {
+        NSColor(hex: hex)
     }
 }

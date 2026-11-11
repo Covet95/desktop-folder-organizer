@@ -52,7 +52,7 @@ final class PanelView: NSView, NSPopoverDelegate {
         layer?.cornerCurve = .continuous
 
         effectView.blendingMode = .behindWindow
-        effectView.material = PanelAppearance.material
+        effectView.material = PanelAppearance.material(for: .desktop)
         effectView.state = .active
         effectView.autoresizingMask = [.width, .height]
         effectView.wantsLayer = true
@@ -185,15 +185,27 @@ final class PanelView: NSView, NSPopoverDelegate {
         let previous = lastConfig
         lastConfig = config
 
+        let panelAppearance = PanelAppearance.appearance(for: config.backgroundHex)
+        if appearance?.name != panelAppearance.name {
+            appearance = panelAppearance
+        }
+        if effectView.appearance?.name != panelAppearance.name {
+            effectView.appearance = panelAppearance
+        }
+        if tintView.appearance?.name != panelAppearance.name {
+            tintView.appearance = panelAppearance
+        }
+
         primaryColor = PanelAppearance.primaryText
         secondaryColor = PanelAppearance.secondaryText
 
-        effectView.material = PanelAppearance.material
-        effectView.alphaValue = PanelAppearance.materialOpacity(config.opacity)
+        effectView.material = PanelAppearance.material(for: config.levelMode)
+        // Never fade the NSVisualEffectView itself: doing so weakens the native blur
+        // and wallpaper sampling. The user control only changes the independent tint.
+        effectView.alphaValue = 1
         let tint = PanelAppearance.customTint(for: config.backgroundHex)
-        tintView.layer?.backgroundColor = tint?
+        tintView.layer?.backgroundColor = tint
             .withAlphaComponent(PanelAppearance.tintOpacity(config.opacity)).cgColor
-            ?? NSColor.clear.cgColor
         tintView.layer?.cornerRadius = config.cornerRadius
         tintView.layer?.cornerCurve = .continuous
         tintView.layer?.masksToBounds = true
@@ -385,6 +397,7 @@ final class PanelView: NSView, NSPopoverDelegate {
 
         let popover = NSPopover()
         popover.behavior = .transient
+        popover.appearance = PanelAppearance.appearance(for: store.config.backgroundHex)
         popover.delegate = self
 
         let controller = SettingsViewController(store: store, appStore: appStore)

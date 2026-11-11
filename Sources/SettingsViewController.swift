@@ -6,7 +6,7 @@ final class SettingsViewController: NSViewController {
     private let appStore: AppStore
     var onDelete: (() -> Void)?
 
-    private let presets = ["#1C1C1E", "#DCE6F2", "#E8E0F1", "#DFEBE2", "#F1E6D9", "#E6E8EB"]
+    private let presets = [PanelAppearance.defaultTintHex, "#0F5B59", "#454071", "#5A4638", "#2F4A61", "#41464E"]
     private let sizes: [(Double, Double)] = [(330, 300), (390, 360), (480, 440)]
     private var swatches: [NSButton] = []
     private let colorWell = NSColorWell(frame: .zero)
@@ -47,12 +47,12 @@ final class SettingsViewController: NSViewController {
             button.title = ""
             button.isBordered = false
             button.tag = index
-            button.toolTip = index == 0 ? "跟随 macOS 外观" : "轻量自定义色调"
+            button.toolTip = index == 0 ? "蓝色玻璃（默认）" : "自定义玻璃色调"
             button.target = self
             button.action = #selector(swatchTapped(_:))
             button.wantsLayer = true
             button.layer?.cornerRadius = 12
-            button.layer?.backgroundColor = (index == 0 ? NSColor.windowBackgroundColor : NSColor(hex: hex)).cgColor
+            button.layer?.backgroundColor = NSColor(hex: hex).cgColor
             root.addSubview(button)
             swatches.append(button)
         }
@@ -63,7 +63,7 @@ final class SettingsViewController: NSViewController {
         colorWell.action = #selector(colorWellChanged(_:))
         root.addSubview(colorWell)
 
-        addLabel("背景不透明度", frame: CGRect(x: 18, y: 116, width: 76, height: 18), font: .systemFont(ofSize: 12))
+        addLabel("背景色调强度", frame: CGRect(x: 18, y: 116, width: 76, height: 18), font: .systemFont(ofSize: 12))
         opacitySlider.frame = CGRect(x: 102, y: 114, width: 156, height: 20)
         opacitySlider.controlSize = .small
         opacitySlider.target = self
@@ -156,7 +156,7 @@ final class SettingsViewController: NSViewController {
     }
 
     private func update(_ config: PanelConfig) {
-        colorWell.color = PanelAppearance.customTint(for: config.backgroundHex) ?? NSColor.windowBackgroundColor
+        colorWell.color = PanelAppearance.customTint(for: config.backgroundHex)
         opacitySlider.doubleValue = config.opacity
         opacityValue.stringValue = "\(Int(config.opacity * 100))%"
         columnsStepper.integerValue = config.columns
@@ -167,7 +167,7 @@ final class SettingsViewController: NSViewController {
         deleteButton.isEnabled = appStore.canDeletePanel
 
         for (index, button) in swatches.enumerated() {
-            let swatchColor = index == 0 ? NSColor.windowBackgroundColor : NSColor(hex: presets[index])
+            let swatchColor = NSColor(hex: presets[index])
             button.layer?.backgroundColor = swatchColor.cgColor
             let selected = presets[index].caseInsensitiveCompare(config.backgroundHex) == .orderedSame
             button.layer?.borderWidth = selected ? 2 : 1
