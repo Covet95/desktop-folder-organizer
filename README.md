@@ -1,6 +1,6 @@
 # 文档整理
 
-一个基于 Swift + AppKit 的 macOS 桌面文件整理应用。它以独立菜单栏应用运行，并提供可自由摆放的桌面面板；它不是 WidgetKit 系统小组件。
+一个基于 Swift + AppKit 的 macOS 桌面文件整理应用。它以独立菜单栏应用运行，保留可自由摆放的 AppKit 文件管理面板，并通过 WidgetKit 在桌面显示整理目录摘要。
 
 ## 当前能力
 
@@ -59,7 +59,7 @@
 
 ## 构建
 
-需要 macOS、Swift 编译器和 Xcode Command Line Tools。
+构建需要 macOS、Swift 编译器和 Xcode Command Line Tools；若要使用免费 Personal Team 的 Apple Development 签名，还需要安装完整 Xcode 并在 Accounts 中登录 Apple Account。
 
 默认构建 Universal Binary（Apple Silicon + Intel），最低系统版本从 `Info.plist` 的 `LSMinimumSystemVersion` 读取：
 
@@ -76,13 +76,24 @@ ARCHS=x86_64 ./build.sh
 
 构建脚本先在临时目录完成编译、签名和校验，成功后才替换旧的 `build/文档整理.app`。因此编译失败不会先删除现有应用。
 
-默认使用 Ad-hoc 签名，仅适用于本机开发和测试。公开分发需要 Developer ID Application 证书、Hardened Runtime、Apple 公证和后续 Gatekeeper 验证：
+默认使用 Ad-hoc 签名，仅用于本机预览；此时不能据此验收主应用与 WidgetKit 的 App Group 数据共享。
+
+**免费 Apple Account 本机签名：**
+
+1. 安装完整 Xcode，在 Xcode > Settings > Accounts 中添加自己的 Apple Account。
+2. 选择 Personal Team，并在 Manage Certificates 中创建 Apple Development 证书。
+3. 从 Xcode 账户信息取得 Team ID；在终端执行 `security find-identity -v -p codesigning`，确认 Apple Development 身份已出现在钥匙串。
+4. 使用同一个 Team ID 和 Apple Development 身份构建：
 
 ```bash
-CODESIGN_IDENTITY="Developer ID Application: <证书名称>" ./build.sh
+TEAM_ID="<你的10位Team ID>" \
+CODESIGN_IDENTITY="Apple Development: <证书名称> (<你的10位Team ID>)" \
+./build.sh
 ```
 
-签名身份必须存在于当前 Mac 的钥匙串中。构建脚本不代替公证流程。
+构建脚本会为主应用和 Widget Extension 写入相同的 macOS App Group 标识：`<Team ID>.com.covet.DesktopFolderWidget`。这种 macOS 团队 ID 前缀形式不需要在开发者网站注册 App Group，也不需要为该 App Group 单独配置预置描述文件；签名代码的 Team ID 必须与标识前缀一致。参见 [Apple：Accessing app group containers](https://developer.apple.com/documentation/xcode/accessing-app-group-containers)。
+
+该方案仅用于自己的 Mac 本机开发和使用，不提供 App Store 上架、Developer ID 分发或公证能力。签名身份必须存在于当前 Mac 的钥匙串中。
 
 ## 测试
 
@@ -103,4 +114,4 @@ CODESIGN_IDENTITY="Developer ID Application: <证书名称>" ./build.sh
 - 小组件只读取主应用写入共享 App Group 的文件名与计数摘要；不直接移动、删除或访问原始文件
 - 点击小组件打开交互式 AppKit 面板；历史自动收纳、文件恢复、拖放与搜索逻辑不变
 - 在菜单栏「文档整理」中选择「显示/隐藏全部面板」可以隐藏旧桌面面板，避免与 WidgetKit 小组件叠放
-- App Group 为 group.com.covet.DesktopFolderWidget；WidgetKit 数据共享需要由同一 Apple 开发团队签名、启用并注册该 App Group。Ad-hoc 虽能编译和登记扩展，但不能保证运行或访问共享容器。当前开发机没有 Apple Development 证书，尚未完成真实小组件数据验收
+- 主应用和 Widget Extension 通过 App Group 共享摘要文件；免费 Personal Team 本机开发使用 macOS 团队 ID 前缀标识 `<Team ID>.com.covet.DesktopFolderWidget`。Ad-hoc 签名只用于预览，不能作为共享容器验收依据；必须使用同一 Personal Team 的 Apple Development 身份签署两个 bundle

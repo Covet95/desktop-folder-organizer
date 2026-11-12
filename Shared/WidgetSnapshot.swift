@@ -7,7 +7,10 @@ struct WidgetSummaryItem: Codable, Equatable {
 
 struct DesktopWidgetSnapshot: Codable, Equatable {
     static let kind = "DesktopFolderSummaryWidget"
-    static let appGroup = "group.com.covet.DesktopFolderWidget"
+    static var appGroup: String {
+        Bundle.main.object(forInfoDictionaryKey: "DFWAppGroupIdentifier") as? String
+            ?? "group.com.covet.DesktopFolderWidget"
+    }
     static let filename = "widget-snapshot.json"
 
     let updatedAt: Date
