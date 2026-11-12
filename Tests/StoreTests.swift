@@ -75,6 +75,15 @@ struct StoreTests {
         store.add(urls: [report, budget, projectFolder])
         expect(store.config.items.count == 3, "add three items")
         expect(store.config.items.map(\.name).contains("项目资料"), "folder item added")
+        expect(store.config.isTypeGroupingEnabled, "existing panels default to visual type grouping")
+        expect(WidgetItem(path: report.path).displayGroup == .documents, "PDF appears in document section")
+        expect(WidgetItem(path: budget.path).displayGroup == .spreadsheets, "spreadsheet appears in table section")
+        expect(WidgetItem(path: projectFolder.path).displayGroup == .folders, "existing folder appears in folder section")
+        expect(WidgetItem(path: root.appendingPathComponent("photo.HEIC").path).displayGroup == .images,
+               "image extension is matched case-insensitively")
+        store.config.groupByType = false
+        expect(!store.config.isTypeGroupingEnabled, "type grouping can be turned off without changing paths")
+        store.config.groupByType = true
 
         store.add(urls: [report])
         expect(store.config.items.count == 3, "duplicate path ignored")
@@ -108,6 +117,7 @@ struct StoreTests {
         expect(appStore.panels.count == 1, "app store creates one default panel")
 
         appStore.panels[0].add(urls: [report, budget])
+        appStore.panels[0].config.groupByType = false
         appStore.saveNow()
         let loaded: [PanelConfig]?
         if case .loaded(let panels) = persistence.load() {
@@ -118,6 +128,7 @@ struct StoreTests {
         expect(loaded?.count == 1, "panels persist")
         expect(loaded?.first?.items.count == 2, "items persist")
         expect(loaded?.first?.items.first?.name == "报告.pdf", "saved item name survives")
+        expect(loaded?.first?.groupByType == false, "panel type-group preference persists")
 
         let memoryRepository = InMemoryPanelStateRepository(
             directory: root.appendingPathComponent("InMemorySupport", isDirectory: true)

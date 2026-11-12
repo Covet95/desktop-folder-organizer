@@ -6,6 +6,8 @@ final class GridView: NSView {
     private(set) var itemViews: [ItemView] = []
     private var addTile: AddTileView?
     private var labelColor: NSColor = PanelAppearance.primaryText
+    private var groupedSections: [(header: NSTextField, range: Range<Int>)] = []
+    private var typeGrouping = false
 
     var onAddRequested: (() -> Void)?
 
@@ -26,19 +28,40 @@ final class GridView: NSView {
         for view in itemViews {
             view.setLabelColor(color)
         }
+        for section in groupedSections {
+            section.header.textColor = PanelAppearance.secondaryText
+        }
         addTile?.setColor(color)
     }
 
-    func reload(items: [WidgetItem], isSearching: Bool) {
+    func reload(items: [WidgetItem], isSearching: Bool, groupByType: Bool) {
         subviews.forEach { $0.removeFromSuperview() }
         itemViews.removeAll()
+        groupedSections.removeAll()
         addTile = nil
+        typeGrouping = groupByType
 
-        for item in items {
-            let view = ItemView(item: item, store: store, labelColor: labelColor)
-            view.panelView = panelView
-            addSubview(view)
-            itemViews.append(view)
+        if groupByType {
+            // Classify once per refresh, then preserve each group's saved order.
+            var buckets: [FileDisplayGroup: [WidgetItem]] = [:]
+            for item in items {
+                buckets[item.displayGroup, default: []].append(item)
+            }
+            for group in FileDisplayGroup.allCases {
+                guard let matching = buckets[group], !matching.isEmpty else { continue }
+
+                let header = NSTextField(labelWithString: "\(group.title) · \(matching.count)")
+                header.font = .systemFont(ofSize: 11, weight: .semibold)
+                header.textColor = PanelAppearance.secondaryText
+                header.isSelectable = false
+                addSubview(header)
+
+                let start = itemViews.count
+                for item in matching { addItem(item) }
+                groupedSections.append((header, start..<itemViews.count))
+            }
+        } else {
+            for item in items { addItem(item) }
         }
 
         if !isSearching {
@@ -50,6 +73,13 @@ final class GridView: NSView {
         }
 
         needsLayout = true
+    }
+
+    private func addItem(_ item: WidgetItem) {
+        let view = ItemView(item: item, store: store, labelColor: labelColor)
+        view.panelView = panelView
+        addSubview(view)
+        itemViews.append(view)
     }
 
     override func layout() {
@@ -64,24 +94,50 @@ final class GridView: NSView {
         let cellWidth = max(1, (width - spacingX * CGFloat(columns - 1)) / CGFloat(columns))
         let cellHeight: CGFloat = 76
 
-        var views: [NSView] = itemViews
-        if let addTile {
-            views.append(addTile)
+        var contentHeight: CGFloat
+
+        if typeGrouping {
+            var y: CGFloat = 0
+            for section in groupedSections {
+                section.header.frame = CGRect(x: 2, y: y, width: max(0, width - 4), height: 19)
+                y += 24
+                for (localIndex, index) in section.range.enumerated() {
+                    let row = localIndex / columns
+                    let column = localIndex % columns
+                    itemViews[index].frame = CGRect(
+                        x: CGFloat(column) * (cellWidth + spacingX),
+                        y: y + CGFloat(row) * (cellHeight + spacingY),
+                        width: cellWidth,
+                        height: cellHeight
+                    )
+                }
+                let count = section.range.count
+                let rows = (count + columns - 1) / columns
+                y += CGFloat(rows) * cellHeight + CGFloat(max(0, rows - 1)) * spacingY + 13
+            }
+            if let addTile {
+                addTile.frame = CGRect(x: 0, y: y, width: cellWidth, height: cellHeight)
+                y += cellHeight + 4
+            }
+            contentHeight = max(y, 4)
+        } else {
+            var views: [NSView] = itemViews
+            if let addTile { views.append(addTile) }
+
+            for (index, view) in views.enumerated() {
+                let row = index / columns
+                let column = index % columns
+                view.frame = CGRect(
+                    x: CGFloat(column) * (cellWidth + spacingX),
+                    y: CGFloat(row) * (cellHeight + spacingY),
+                    width: cellWidth,
+                    height: cellHeight
+                )
+            }
+            let rows = max(1, (views.count + columns - 1) / columns)
+            contentHeight = CGFloat(rows) * cellHeight + CGFloat(max(0, rows - 1)) * spacingY + 4
         }
 
-        for (index, view) in views.enumerated() {
-            let row = index / columns
-            let column = index % columns
-            view.frame = CGRect(
-                x: CGFloat(column) * (cellWidth + spacingX),
-                y: CGFloat(row) * (cellHeight + spacingY),
-                width: cellWidth,
-                height: cellHeight
-            )
-        }
-
-        let rows = max(1, (views.count + columns - 1) / columns)
-        let contentHeight = CGFloat(rows) * cellHeight + CGFloat(max(0, rows - 1)) * spacingY + 4
         let height = max(contentHeight, superview?.bounds.height ?? 0)
         if abs(frame.height - height) > 0.5 {
             frame.size.height = height
@@ -99,6 +155,20 @@ final class GridView: NSView {
     func index(at point: NSPoint, itemCount: Int) -> Int {
         guard itemCount > 0 else { return 0 }
 
+        if typeGrouping {
+            // A category header or gap selects the nearest visible icon.
+            // The resulting index is in displayed (section-sorted) order.
+            return itemViews.enumerated().min {
+                let a = $0.element.frame
+                let b = $1.element.frame
+                let ax = max(a.minX, min(point.x, a.maxX))
+                let ay = max(a.minY, min(point.y, a.maxY))
+                let bx = max(b.minX, min(point.x, b.maxX))
+                let by = max(b.minY, min(point.y, b.maxY))
+                return hypot(ax - point.x, ay - point.y) < hypot(bx - point.x, by - point.y)
+            }?.offset ?? 0
+        }
+
         let columns = max(1, store.config.columns)
         let spacingX: CGFloat = 8
         let spacingY: CGFloat = 6
@@ -108,6 +178,11 @@ final class GridView: NSView {
         let column = max(0, min(columns - 1, Int((point.x + spacingX / 2) / (cellWidth + spacingX))))
         let row = max(0, Int((point.y + spacingY / 2) / (cellHeight + spacingY)))
         return min(itemCount - 1, row * columns + column)
+    }
+
+    func displayedItem(at index: Int) -> WidgetItem? {
+        guard itemViews.indices.contains(index) else { return nil }
+        return itemViews[index].item
     }
 
     func setDropTarget(_ index: Int?) {

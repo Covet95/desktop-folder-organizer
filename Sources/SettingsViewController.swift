@@ -12,6 +12,7 @@ final class SettingsViewController: NSViewController {
     private let columnsStepper = NSStepper(frame: .zero)
     private let levelControl = NSSegmentedControl(labels: ["桌面层", "悬浮置顶"], trackingMode: .selectOne, target: nil, action: nil)
     private let lockCheckbox = NSButton(checkboxWithTitle: "锁定位置（禁止拖动面板）", target: nil, action: nil)
+    private let groupCheckbox = NSButton(checkboxWithTitle: "按文件类型分区显示", target: nil, action: nil)
     private let deleteButton = NSButton(title: "删除面板", target: nil, action: nil)
     private var cancellables = Set<AnyCancellable>()
 
@@ -19,7 +20,7 @@ final class SettingsViewController: NSViewController {
         self.store = store
         self.appStore = appStore
         super.init(nibName: nil, bundle: nil)
-        preferredContentSize = NSSize(width: 320, height: 270)
+        preferredContentSize = NSSize(width: 320, height: 308)
     }
 
     required init?(coder: NSCoder) {
@@ -27,7 +28,7 @@ final class SettingsViewController: NSViewController {
     }
 
     override func loadView() {
-        let root = FlippedView(frame: NSRect(x: 0, y: 0, width: 320, height: 270))
+        let root = FlippedView(frame: NSRect(x: 0, y: 0, width: 320, height: 308))
         root.onAppearanceChanged = { [weak self] in
             guard let self else { return }
             self.update(self.store.config)
@@ -70,12 +71,19 @@ final class SettingsViewController: NSViewController {
         lockCheckbox.action = #selector(lockChanged(_:))
         root.addSubview(lockCheckbox)
 
-        let separator = NSBox(frame: CGRect(x: 18, y: 236, width: 284, height: 1))
+        groupCheckbox.frame = CGRect(x: 18, y: 236, width: 284, height: 20)
+        groupCheckbox.controlSize = .small
+        groupCheckbox.font = .systemFont(ofSize: 12)
+        groupCheckbox.target = self
+        groupCheckbox.action = #selector(groupingChanged(_:))
+        root.addSubview(groupCheckbox)
+
+        let separator = NSBox(frame: CGRect(x: 18, y: 269, width: 284, height: 1))
         separator.boxType = .separator
         root.addSubview(separator)
 
         let clearButton = NSButton(title: "清空失效条目", target: self, action: #selector(clearMissing))
-        clearButton.frame = CGRect(x: 18, y: 242, width: 128, height: 24)
+        clearButton.frame = CGRect(x: 18, y: 276, width: 128, height: 24)
         clearButton.controlSize = .small
         clearButton.bezelStyle = .rounded
         clearButton.font = .systemFont(ofSize: 11)
@@ -83,7 +91,7 @@ final class SettingsViewController: NSViewController {
 
         deleteButton.target = self
         deleteButton.action = #selector(deletePanel)
-        deleteButton.frame = CGRect(x: 208, y: 242, width: 94, height: 24)
+        deleteButton.frame = CGRect(x: 208, y: 276, width: 94, height: 24)
         deleteButton.controlSize = .small
         deleteButton.bezelStyle = .rounded
         deleteButton.font = .systemFont(ofSize: 11)
@@ -122,6 +130,7 @@ final class SettingsViewController: NSViewController {
         sizeControl.selectedSegment = closestSizeIndex(to: config.frame)
         levelControl.selectedSegment = config.levelMode == .desktop ? 0 : 1
         lockCheckbox.state = config.positionLocked ? .on : .off
+        groupCheckbox.state = config.isTypeGroupingEnabled ? .on : .off
         deleteButton.isEnabled = appStore.canDeletePanel
 
     }
@@ -160,6 +169,10 @@ final class SettingsViewController: NSViewController {
 
     @objc private func lockChanged(_ sender: NSButton) {
         store.config.isLocked = sender.state == .on
+    }
+
+    @objc private func groupingChanged(_ sender: NSButton) {
+        store.config.groupByType = sender.state == .on
     }
 
     @objc private func clearMissing() {

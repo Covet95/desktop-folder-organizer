@@ -46,6 +46,51 @@ struct PanelFrame: Codable, Equatable {
     static let `default` = PanelFrame(x: 140, y: 360, width: 390, height: 360)
 }
 
+/// Visual-only classification: never changes a file's storage URL.
+enum FileDisplayGroup: String, CaseIterable {
+    case folders, images, documents, spreadsheets, presentations, videos, audio, archives, code, other
+
+    var title: String {
+        switch self {
+        case .folders: return "文件夹"
+        case .images: return "图片"
+        case .documents: return "文档"
+        case .spreadsheets: return "表格"
+        case .presentations: return "演示文稿"
+        case .videos: return "视频"
+        case .audio: return "音频"
+        case .archives: return "压缩包"
+        case .code: return "代码"
+        case .other: return "其他"
+        }
+    }
+
+    static func forItem(_ item: WidgetItem) -> FileDisplayGroup {
+        if item.isDirectory { return .folders }
+        let ext = item.url.pathExtension.lowercased()
+        switch ext {
+        case "jpg", "jpeg", "png", "heic", "heif", "gif", "webp", "bmp", "tif", "tiff", "svg", "raw", "dng":
+            return .images
+        case "pdf", "doc", "docx", "pages", "txt", "rtf", "rtfd", "md", "epub", "odt":
+            return .documents
+        case "xls", "xlsx", "numbers", "csv", "tsv", "ods":
+            return .spreadsheets
+        case "ppt", "pptx", "key", "odp":
+            return .presentations
+        case "mp4", "mov", "m4v", "avi", "mkv", "wmv", "flv", "webm":
+            return .videos
+        case "mp3", "m4a", "aac", "wav", "aiff", "flac", "ogg", "wma":
+            return .audio
+        case "zip", "7z", "rar", "tar", "gz", "bz2", "xz", "dmg", "pkg":
+            return .archives
+        case "swift", "py", "js", "ts", "html", "css", "json", "xml", "yaml", "yml", "sh", "sql", "ipynb", "java", "cpp", "c", "h":
+            return .code
+        default:
+            return .other
+        }
+    }
+}
+
 struct WidgetItem: Codable, Identifiable, Equatable {
     var id: UUID
     var path: String
@@ -71,6 +116,8 @@ struct WidgetItem: Codable, Identifiable, Equatable {
     var isDirectory: Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
     }
+
+    var displayGroup: FileDisplayGroup { FileDisplayGroup.forItem(self) }
 }
 
 enum PanelLevelMode: String, Codable, CaseIterable, Identifiable {
@@ -96,6 +143,7 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     var isHidden: Bool
     var cornerRadius: Double
     var isLocked: Bool?
+    var groupByType: Bool?
 
     init(
         id: UUID = UUID(),
@@ -105,7 +153,8 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         levelMode: PanelLevelMode = .desktop,
         isHidden: Bool = false,
         cornerRadius: Double = 22,
-        isLocked: Bool? = nil
+        isLocked: Bool? = nil,
+        groupByType: Bool? = nil
     ) {
         self.id = id
         self.frame = frame
@@ -115,11 +164,15 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         self.isHidden = isHidden
         self.cornerRadius = cornerRadius
         self.isLocked = isLocked
+        self.groupByType = groupByType
     }
 
     var positionLocked: Bool {
         isLocked ?? false
     }
+
+    /// Existing panels default to visual grouping without a schema migration.
+    var isTypeGroupingEnabled: Bool { groupByType ?? true }
 
     static func makeDefault(index: Int) -> PanelConfig {
         var frame = PanelFrame.default

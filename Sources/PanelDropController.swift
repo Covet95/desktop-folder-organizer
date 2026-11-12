@@ -42,6 +42,15 @@ final class PanelDropController {
             guard !isSearching() else { return [] }
             let point = gridView.convert(sender.draggingLocation, from: nil)
             let index = gridView.index(at: point, itemCount: store.filteredItems.count)
+            if store.config.isTypeGroupingEnabled,
+               let sourceString = sender.draggingPasteboard.string(forType: PanelView.itemPasteboardType),
+               let sourceID = UUID(uuidString: sourceString),
+               let source = store.config.items.first(where: { $0.id == sourceID }),
+               let target = gridView.displayedItem(at: index),
+               source.displayGroup != target.displayGroup {
+                gridView.setDropTarget(nil)
+                return []
+            }
             gridView.setDropTarget(index)
             return .move
         }
@@ -71,7 +80,16 @@ final class PanelDropController {
 
             let point = gridView.convert(location, from: nil)
             let index = gridView.index(at: point, itemCount: store.filteredItems.count)
-            store.move(id: id, toIndex: index)
+            if store.config.isTypeGroupingEnabled {
+                guard let source = store.config.items.first(where: { $0.id == id }),
+                      let target = gridView.displayedItem(at: index),
+                      source.displayGroup == target.displayGroup,
+                      let savedIndex = store.config.items.firstIndex(where: { $0.id == target.id })
+                else { return false }
+                store.move(id: id, toIndex: savedIndex)
+            } else {
+                store.move(id: id, toIndex: index)
+            }
             return true
         }
 

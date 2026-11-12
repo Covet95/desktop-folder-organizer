@@ -124,7 +124,8 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
                     self.configChanged(config)
                     if previous == nil
                         || previous?.items != config.items
-                        || previous?.columns != config.columns {
+                        || previous?.columns != config.columns
+                        || previous?.groupByType != config.groupByType {
                         self.scheduleRefresh()
                     }
                 }
@@ -243,7 +244,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         let items = store.filteredItems
         let searching = isSearchActive
 
-        gridView.reload(items: items, isSearching: searching)
+        gridView.reload(items: items, isSearching: searching, groupByType: store.config.isTypeGroupingEnabled)
         updateEmptyState(items: items, searching: searching)
         gridView.needsLayout = true
         needsLayout = true
