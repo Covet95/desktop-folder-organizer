@@ -8,14 +8,6 @@ final class SettingsViewController: NSViewController {
 
     private let sizes: [(Double, Double)] = [(330, 300), (390, 360), (480, 440)]
     private let sizeControl = NSSegmentedControl(labels: ["小", "中", "大"], trackingMode: .selectOne, target: nil, action: nil)
-    private let opacitySlider = NSSlider(
-        value: 1 - PanelAppearance.defaultMaterialOpacity,
-        minValue: 1 - PanelAppearance.maximumMaterialOpacity,
-        maxValue: 1 - PanelAppearance.minimumMaterialOpacity,
-        target: nil,
-        action: nil
-    )
-    private let opacityValue = NSTextField(labelWithString: "")
     private let columnsValue = NSTextField(labelWithString: "")
     private let columnsStepper = NSStepper(frame: .zero)
     private let levelControl = NSSegmentedControl(labels: ["桌面层", "悬浮置顶"], trackingMode: .selectOne, target: nil, action: nil)
@@ -27,7 +19,7 @@ final class SettingsViewController: NSViewController {
         self.store = store
         self.appStore = appStore
         super.init(nibName: nil, bundle: nil)
-        preferredContentSize = NSSize(width: 320, height: 334)
+        preferredContentSize = NSSize(width: 320, height: 270)
     }
 
     required init?(coder: NSCoder) {
@@ -35,7 +27,7 @@ final class SettingsViewController: NSViewController {
     }
 
     override func loadView() {
-        let root = FlippedView(frame: NSRect(x: 0, y: 0, width: 320, height: 334))
+        let root = FlippedView(frame: NSRect(x: 0, y: 0, width: 320, height: 270))
         root.onAppearanceChanged = { [weak self] in
             guard let self else { return }
             self.update(self.store.config)
@@ -43,27 +35,8 @@ final class SettingsViewController: NSViewController {
         view = root
 
         addLabel("面板设置", frame: CGRect(x: 18, y: 16, width: 284, height: 20), font: .systemFont(ofSize: 14, weight: .semibold))
-        addLabel("壁纸透出程度", frame: CGRect(x: 18, y: 50, width: 86, height: 18), font: .systemFont(ofSize: 12))
-        opacitySlider.frame = CGRect(x: 106, y: 48, width: 150, height: 20)
-        opacitySlider.controlSize = .small
-        opacitySlider.toolTip = "数值越高，桌面原始壁纸透出越多；不叠加任何颜色"
-        opacitySlider.target = self
-        opacitySlider.action = #selector(opacityChanged(_:))
-        root.addSubview(opacitySlider)
-        opacityValue.frame = CGRect(x: 262, y: 50, width: 40, height: 18)
-        opacityValue.alignment = .right
-        opacityValue.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-        root.addSubview(opacityValue)
-
-        addLabel(
-            "使用桌面原始颜色与 macOS 原生模糊，不额外染色",
-            frame: CGRect(x: 18, y: 76, width: 284, height: 18),
-            font: .systemFont(ofSize: 10),
-            color: .secondaryLabelColor
-        )
-
-        addLabel("每行图标", frame: CGRect(x: 18, y: 110, width: 100, height: 18), font: .systemFont(ofSize: 12))
-        columnsStepper.frame = CGRect(x: 250, y: 107, width: 20, height: 24)
+        addLabel("每行图标", frame: CGRect(x: 18, y: 50, width: 100, height: 18), font: .systemFont(ofSize: 12))
+        columnsStepper.frame = CGRect(x: 250, y: 47, width: 20, height: 24)
         columnsStepper.controlSize = .small
         columnsStepper.minValue = 3
         columnsStepper.maxValue = 7
@@ -71,38 +44,38 @@ final class SettingsViewController: NSViewController {
         columnsStepper.target = self
         columnsStepper.action = #selector(columnsChanged(_:))
         root.addSubview(columnsStepper)
-        columnsValue.frame = CGRect(x: 274, y: 110, width: 28, height: 18)
+        columnsValue.frame = CGRect(x: 274, y: 50, width: 28, height: 18)
         columnsValue.alignment = .right
         columnsValue.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         root.addSubview(columnsValue)
 
-        addLabel("面板尺寸", frame: CGRect(x: 18, y: 148, width: 284, height: 16), font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
-        sizeControl.frame = CGRect(x: 18, y: 170, width: 284, height: 26)
+        addLabel("面板尺寸", frame: CGRect(x: 18, y: 88, width: 284, height: 16), font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
+        sizeControl.frame = CGRect(x: 18, y: 110, width: 284, height: 26)
         sizeControl.controlSize = .small
         sizeControl.target = self
         sizeControl.action = #selector(sizeChanged(_:))
         root.addSubview(sizeControl)
 
-        addLabel("窗口层级", frame: CGRect(x: 18, y: 210, width: 284, height: 16), font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
-        levelControl.frame = CGRect(x: 18, y: 232, width: 284, height: 26)
+        addLabel("窗口层级", frame: CGRect(x: 18, y: 150, width: 284, height: 16), font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
+        levelControl.frame = CGRect(x: 18, y: 172, width: 284, height: 26)
         levelControl.controlSize = .small
         levelControl.target = self
         levelControl.action = #selector(levelChanged(_:))
         root.addSubview(levelControl)
 
-        lockCheckbox.frame = CGRect(x: 18, y: 268, width: 284, height: 20)
+        lockCheckbox.frame = CGRect(x: 18, y: 208, width: 284, height: 20)
         lockCheckbox.controlSize = .small
         lockCheckbox.font = .systemFont(ofSize: 12)
         lockCheckbox.target = self
         lockCheckbox.action = #selector(lockChanged(_:))
         root.addSubview(lockCheckbox)
 
-        let separator = NSBox(frame: CGRect(x: 18, y: 296, width: 284, height: 1))
+        let separator = NSBox(frame: CGRect(x: 18, y: 236, width: 284, height: 1))
         separator.boxType = .separator
         root.addSubview(separator)
 
         let clearButton = NSButton(title: "清空失效条目", target: self, action: #selector(clearMissing))
-        clearButton.frame = CGRect(x: 18, y: 302, width: 128, height: 24)
+        clearButton.frame = CGRect(x: 18, y: 242, width: 128, height: 24)
         clearButton.controlSize = .small
         clearButton.bezelStyle = .rounded
         clearButton.font = .systemFont(ofSize: 11)
@@ -110,7 +83,7 @@ final class SettingsViewController: NSViewController {
 
         deleteButton.target = self
         deleteButton.action = #selector(deletePanel)
-        deleteButton.frame = CGRect(x: 208, y: 302, width: 94, height: 24)
+        deleteButton.frame = CGRect(x: 208, y: 242, width: 94, height: 24)
         deleteButton.controlSize = .small
         deleteButton.bezelStyle = .rounded
         deleteButton.font = .systemFont(ofSize: 11)
@@ -144,12 +117,6 @@ final class SettingsViewController: NSViewController {
     }
 
     private func update(_ config: PanelConfig) {
-        let wallpaperVisibility = min(
-            max(1 - config.opacity, opacitySlider.minValue),
-            opacitySlider.maxValue
-        )
-        opacitySlider.doubleValue = wallpaperVisibility
-        opacityValue.stringValue = "\(Int(wallpaperVisibility * 100))%"
         columnsStepper.integerValue = config.columns
         columnsValue.stringValue = "\(config.columns)"
         sizeControl.selectedSegment = closestSizeIndex(to: config.frame)
@@ -157,10 +124,6 @@ final class SettingsViewController: NSViewController {
         lockCheckbox.state = config.positionLocked ? .on : .off
         deleteButton.isEnabled = appStore.canDeletePanel
 
-    }
-
-    @objc private func opacityChanged(_ sender: NSSlider) {
-        store.config.opacity = 1 - sender.doubleValue
     }
 
     @objc private func columnsChanged(_ sender: NSStepper) {

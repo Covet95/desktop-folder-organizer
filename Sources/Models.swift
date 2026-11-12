@@ -1,20 +1,6 @@
 import Foundation
 import CoreGraphics
 
-enum PanelDefaults {
-    static let minimumMaterialOpacity = 0.08
-    static let maximumMaterialOpacity = 0.85
-    static let materialOpacity = 0.22
-
-    static func normalizedMaterialOpacity(_ value: Double) -> Double {
-        guard value.isFinite,
-              value >= minimumMaterialOpacity,
-              value <= maximumMaterialOpacity
-        else { return materialOpacity }
-        return value
-    }
-}
-
 struct PanelFrame: Codable, Equatable {
     var x: Double
     var y: Double
@@ -105,7 +91,6 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     var id: UUID
     var frame: PanelFrame
     var items: [WidgetItem]
-    var opacity: Double
     var columns: Int
     var levelMode: PanelLevelMode
     var isHidden: Bool
@@ -116,7 +101,6 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         id: UUID = UUID(),
         frame: PanelFrame = .default,
         items: [WidgetItem] = [],
-        opacity: Double = PanelDefaults.materialOpacity,
         columns: Int = 5,
         levelMode: PanelLevelMode = .desktop,
         isHidden: Bool = false,
@@ -126,7 +110,6 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         self.id = id
         self.frame = frame
         self.items = items
-        self.opacity = opacity
         self.columns = columns
         self.levelMode = levelMode
         self.isHidden = isHidden

@@ -1,16 +1,16 @@
 import AppKit
 import Combine
 
-final class PanelView: NSView, NSPopoverDelegate {
+final class PanelView: NSGlassEffectView, NSPopoverDelegate {
     static let itemPasteboardType = NSPasteboard.PasteboardType("com.covet.dfw.item")
 
     let store: PanelStore
     let appStore: AppStore
     var onWindowDragEnded: (() -> Void)?
 
+    private let contentRoot = PanelContentView()
     private let scrollView = NSScrollView()
     private let gridView: GridView
-    private let effectView = PassthroughVisualEffectView()
     private let toolbarView = PanelToolbarView()
     private let quickLook = QuickLookController()
     private lazy var fileActions = PanelFileActionCoordinator(appStore: appStore, panelStore: store)
@@ -46,16 +46,43 @@ final class PanelView: NSView, NSPopoverDelegate {
         self.gridView = GridView(store: store)
         super.init(frame: .zero)
 
-        wantsLayer = true
-        layer?.masksToBounds = true
-        layer?.cornerCurve = .continuous
+        // Use the system's native Clear Liquid Glass surface.
+        style = .clear
+        tintColor = nil
+        cornerRadius = CGFloat(store.config.cornerRadius)
+        effectIsInteractive = false
 
-        effectView.blendingMode = .behindWindow
-        effectView.material = PanelAppearance.material(for: .desktop)
-        effectView.state = .active
-        effectView.autoresizingMask = [.width, .height]
-        effectView.wantsLayer = true
-        addSubview(effectView)
+        contentRoot.autoresizingMask = [.width, .height]
+        contentRoot.wantsLayer = true
+        contentRoot.layer?.backgroundColor = NSColor.clear.cgColor
+        contentRoot.layer?.cornerRadius = CGFloat(store.config.cornerRadius)
+        contentRoot.layer?.cornerCurve = .continuous
+        contentRoot.layer?.masksToBounds = true
+        contentView = contentRoot
+
+        contentRoot.onBackgroundMouseDown = { [weak self] in
+            self?.beginWindowDrag(with: $0)
+        }
+        contentRoot.onMenuRequested = { [weak self] event in
+            self?.menu(for: event)
+        }
+        contentRoot.onDraggingEntered = { [weak self] in
+            self?.dropController.draggingEntered($0) ?? []
+        }
+        contentRoot.onDraggingUpdated = { [weak self] in
+            self?.dropController.draggingUpdated($0) ?? []
+        }
+        contentRoot.onDraggingExited = { [weak self] _ in
+            self?.dropController.draggingExited()
+        }
+        contentRoot.onPerformDragOperation = { [weak self] in
+            guard let self else { return false }
+            return self.dropController.performDrop(
+                pasteboard: $0.draggingPasteboard,
+                location: $0.draggingLocation
+            )
+        }
+        contentRoot.registerForDraggedTypes([.fileURL, Self.itemPasteboardType])
 
         scrollView.drawsBackground = false
         scrollView.hasVerticalScroller = true
@@ -63,7 +90,7 @@ final class PanelView: NSView, NSPopoverDelegate {
         scrollView.scrollerStyle = .overlay
         scrollView.borderType = .noBorder
         scrollView.documentView = gridView
-        addSubview(scrollView)
+        contentRoot.addSubview(scrollView)
 
         toolbarView.onSearchChanged = { [weak store] in store?.searchText = $0 }
         toolbarView.onSearchRequested = { [weak self] in
@@ -78,18 +105,16 @@ final class PanelView: NSView, NSPopoverDelegate {
             self.fileActions.chooseFiles(from: self.window)
         }
         toolbarView.onSettingsRequested = { [weak self] in self?.requestSettings() }
-        addSubview(toolbarView)
+        contentRoot.addSubview(toolbarView)
 
         emptyStateView.onAction = { [weak self] in self?.didTapEmptyButton() }
-        addSubview(emptyStateView)
+        contentRoot.addSubview(emptyStateView)
 
         gridView.panelView = self
         gridView.onAddRequested = { [weak self] in
             guard let self else { return }
             self.fileActions.chooseFiles(from: self.window)
         }
-
-        registerForDraggedTypes([.fileURL, Self.itemPasteboardType])
 
         store.$config
             .sink { [weak self] config in
@@ -183,23 +208,8 @@ final class PanelView: NSView, NSPopoverDelegate {
         primaryColor = PanelAppearance.primaryText
         secondaryColor = PanelAppearance.secondaryText
 
-        effectView.material = PanelAppearance.material(for: config.levelMode)
-        // Only the native wallpaper-sampling material is faded.
-        // File icons, labels and controls remain fully opaque above this layer.
-        effectView.alphaValue = CGFloat(
-            min(max(config.opacity, PanelAppearance.minimumMaterialOpacity),
-                PanelAppearance.maximumMaterialOpacity)
-        )
-        effectView.layer?.cornerRadius = config.cornerRadius
-        effectView.layer?.cornerCurve = .continuous
-        effectView.layer?.masksToBounds = true
-
-        layer?.backgroundColor = NSColor.clear.cgColor
-        layer?.cornerRadius = config.cornerRadius
-        layer?.cornerCurve = .continuous
-        layer?.borderWidth = 1
-        layer?.borderColor = PanelAppearance.border.cgColor
-
+        cornerRadius = CGFloat(config.cornerRadius)
+        contentRoot.layer?.cornerRadius = CGFloat(config.cornerRadius)
         toolbarView.applyAppearance(primaryColor: primaryColor, secondaryColor: secondaryColor)
         emptyStateView.update(
             searching: isSearchActive,
@@ -278,10 +288,6 @@ final class PanelView: NSView, NSPopoverDelegate {
         toolbarView.setHovering(false)
     }
 
-    override func mouseDown(with event: NSEvent) {
-        beginWindowDrag(with: event)
-    }
-
     func beginWindowDrag(with event: NSEvent) {
         window?.makeKey()
         guard !store.config.positionLocked else { return }
@@ -301,33 +307,6 @@ final class PanelView: NSView, NSPopoverDelegate {
         }
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        // A restrained top-edge glint gives the glass a native layered edge without a solid outline.
-        let highlight = NSBezierPath()
-        highlight.move(to: CGPoint(x: store.config.cornerRadius, y: 0.7))
-        highlight.line(to: CGPoint(x: bounds.width - store.config.cornerRadius, y: 0.7))
-        NSColor.white.withAlphaComponent(0.16).setStroke()
-        highlight.lineWidth = 0.8
-        highlight.stroke()
-
-        PanelAppearance.tertiaryText.withAlphaComponent(0.62).setFill()
-        let startX: CGFloat = 14
-        let startY: CGFloat = 17
-        for row in 0..<3 {
-            for column in 0..<3 {
-                let rect = CGRect(
-                    x: startX + CGFloat(column) * 3.4,
-                    y: startY + CGFloat(row) * 3.4,
-                    width: 1.6,
-                    height: 1.6
-                )
-                NSBezierPath(ovalIn: rect).fill()
-            }
-        }
-    }
-
     override func layout() {
         super.layout()
 
@@ -339,7 +318,7 @@ final class PanelView: NSView, NSPopoverDelegate {
         let contentHeight = max(0, bounds.height - contentY - padding)
         let contentRect = CGRect(x: padding, y: contentY, width: contentWidth, height: contentHeight)
 
-        effectView.frame = bounds
+        contentRoot.frame = bounds
         scrollView.frame = contentRect
         gridView.frame.size.width = scrollView.contentSize.width
         gridView.needsLayout = true
@@ -410,29 +389,6 @@ final class PanelView: NSView, NSPopoverDelegate {
         contextMenuController.makeMenu()
     }
 
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        dropController.draggingEntered(sender)
-    }
-
-    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        dropController.draggingUpdated(sender)
-    }
-
-    override func draggingExited(_ sender: NSDraggingInfo?) {
-        dropController.draggingExited()
-    }
-
-    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        true
-    }
-
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        dropController.performDrop(
-            pasteboard: sender.draggingPasteboard,
-            location: sender.draggingLocation
-        )
-    }
-
     @discardableResult
     func performDrop(
         pasteboard: NSPasteboard,
@@ -443,13 +399,62 @@ final class PanelView: NSView, NSPopoverDelegate {
     }
 
     private func setDropHighlight(_ active: Bool) {
-        layer?.borderWidth = active ? 2 : 1
-        layer?.borderColor = active
-            ? NSColor.controlAccentColor.withAlphaComponent(0.72).cgColor
-            : PanelAppearance.border.cgColor
+        contentRoot.layer?.borderWidth = active ? 2 : 0
+        contentRoot.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.72).cgColor
     }
 }
 
-final class PassthroughVisualEffectView: NSVisualEffectView {
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+private final class PanelContentView: NSView {
+    var onBackgroundMouseDown: ((NSEvent) -> Void)?
+    var onMenuRequested: ((NSEvent) -> NSMenu?)?
+    var onDraggingEntered: ((NSDraggingInfo) -> NSDragOperation)?
+    var onDraggingUpdated: ((NSDraggingInfo) -> NSDragOperation)?
+    var onDraggingExited: ((NSDraggingInfo?) -> Void)?
+    var onPerformDragOperation: ((NSDraggingInfo) -> Bool)?
+
+    override var isFlipped: Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        onBackgroundMouseDown?(event)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        onMenuRequested?(event)
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        onDraggingEntered?(sender) ?? []
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        onDraggingUpdated?(sender) ?? []
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        onDraggingExited?(sender)
+    }
+
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        true
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        onPerformDragOperation?(sender) ?? false
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        PanelAppearance.tertiaryText.withAlphaComponent(0.62).setFill()
+        for row in 0..<3 {
+            for column in 0..<3 {
+                let rect = CGRect(
+                    x: 14 + CGFloat(column) * 3.4,
+                    y: 17 + CGFloat(row) * 3.4,
+                    width: 1.6,
+                    height: 1.6
+                )
+                NSBezierPath(ovalIn: rect).fill()
+            }
+        }
+    }
 }

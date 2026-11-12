@@ -53,32 +53,46 @@ struct PanelStateRepositoryTests {
             expect(false, "valid panel state round-trips")
         }
 
-        var legacyOpacityPanel = panel
-        legacyOpacityPanel.opacity = 0.04
-        let legacyOpacityDirectory = root.appendingPathComponent("LegacyOpacity", isDirectory: true)
-        let legacyOpacityRepository = JSONPanelStateRepository(directory: legacyOpacityDirectory)
-        try! legacyOpacityRepository.save([legacyOpacityPanel])
-        if case .loaded(let panels) = legacyOpacityRepository.load() {
-            expect(
-                panels.first?.opacity == PanelDefaults.materialOpacity,
-                "legacy out-of-range material opacity is normalized to the translucent default"
-            )
-        } else {
-            expect(false, "legacy out-of-range material opacity is normalized to the translucent default")
+        let legacyDirectory = root.appendingPathComponent("LegacyAppearance", isDirectory: true)
+        try! fileManager.createDirectory(at: legacyDirectory, withIntermediateDirectories: true)
+        let legacyURL = legacyDirectory.appendingPathComponent("panels.json")
+        let legacyJSON = """
+        {
+          "version": 1,
+          "panels": [{
+            "id": "11111111-2222-3333-4444-555555555555",
+            "frame": {"x": 10, "y": 20, "width": 390, "height": 360},
+            "items": [],
+            "backgroundHex": "#1C1C1E",
+            "opacity": 0.04,
+            "columns": 5,
+            "levelMode": "desktop",
+            "isHidden": false,
+            "cornerRadius": 22
+          }]
         }
-
-        var userOpacityPanel = panel
-        userOpacityPanel.opacity = 0.40
-        let userOpacityDirectory = root.appendingPathComponent("UserOpacity", isDirectory: true)
-        let userOpacityRepository = JSONPanelStateRepository(directory: userOpacityDirectory)
-        try! userOpacityRepository.save([userOpacityPanel])
-        if case .loaded(let panels) = userOpacityRepository.load() {
+        """
+        try! Data(legacyJSON.utf8).write(to: legacyURL)
+        let legacyRepository = JSONPanelStateRepository(directory: legacyDirectory)
+        if case .loaded(let panels) = legacyRepository.load() {
             expect(
-                panels.first?.opacity == 0.40,
-                "a valid user-selected material opacity is preserved"
+                panels.count == 1 && panels[0].frame.width == 390,
+                "legacy panel state loads while ignoring retired appearance keys"
             )
+            do {
+                try legacyRepository.save(panels)
+                let saved = try Data(contentsOf: legacyURL)
+                let object = try JSONSerialization.jsonObject(with: saved) as! [String: Any]
+                let savedPanel = (object["panels"] as! [[String: Any]])[0]
+                expect(
+                    savedPanel["opacity"] == nil && savedPanel["backgroundHex"] == nil,
+                    "retired appearance keys are removed on the next normal save"
+                )
+            } catch {
+                expect(false, "legacy panel state can be saved after migration: \(error)")
+            }
         } else {
-            expect(false, "a valid user-selected material opacity is preserved")
+            expect(false, "legacy panel state loads while ignoring retired appearance keys")
         }
 
         let corruptDirectory = root.appendingPathComponent("Corrupt", isDirectory: true)

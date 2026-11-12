@@ -44,7 +44,6 @@ final class SnapshotRunner {
         try! FileManager.default.createDirectory(at: storageDir, withIntermediateDirectories: true)
         appStore = AppStore(persistence: persistence, storageDirectory: storageDir)
         store = appStore.panels[0]
-        store.config.opacity = 1.0
         store.config.columns = 5
 
         panelView = PanelView(store: store, appStore: appStore)
@@ -62,7 +61,7 @@ final class SnapshotRunner {
 
         let settings = SettingsViewController(store: store, appStore: appStore)
         settingsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 334),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 270),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -70,6 +69,9 @@ final class SnapshotRunner {
         settingsWindow.level = .floating
         settingsWindow.contentView = settings.view
         settingsWindow.setFrameOrigin(NSPoint(x: 560, y: 200))
+        expect(panelView.style == .clear, "panel uses native Clear Liquid Glass")
+        expect(panelView.tintColor == nil, "panel does not apply a custom glass tint")
+        expect(!panelView.effectIsInteractive, "panel glass does not add button-like interaction effects")
     }
 
     deinit {
