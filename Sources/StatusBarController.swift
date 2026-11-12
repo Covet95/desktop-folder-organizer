@@ -25,6 +25,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         let menu = NSMenu()
         menu.delegate = self
+        menu.addItem(menuItem("打开完整管理面板…", action: #selector(openFullPanel), key: ""))
         menu.addItem(menuItem("新建文档面板", action: #selector(newPanel), key: "n"))
         menu.addItem(menuItem("打开存储目录", action: #selector(openStorageDirectory), key: ""))
 
@@ -106,6 +107,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     private func updateHistoryCount(_ count: Int) {
         activityItem?.title = count > 0 ? "收纳记录与恢复（\(count) 项可恢复）…" : "收纳记录与恢复…"
+    }
+
+    @objc private func openFullPanel() {
+        delegate?.openFullPanel()
     }
 
     @objc private func newPanel() {

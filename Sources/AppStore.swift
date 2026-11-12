@@ -13,6 +13,7 @@ final class AppStore: ObservableObject {
 
     var onShowFileActivity: (() -> Void)?
     var onFileRestored: ((URL) -> Void)?
+    var onManagedItemsChanged: (([URL]) -> Void)?
 
     private let persistence: PanelStateRepository
     private let fileOperationService: FileOperationService

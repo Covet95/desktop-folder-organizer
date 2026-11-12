@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController?
     private var globalHotKey: GlobalHotKey?
     private var desktopIntakeCoordinator: DesktopIntakeCoordinator?
+    private let widgetPublisher = WidgetSnapshotPublisher()
     private var fileActivityWindowController: FileActivityWindowController?
     private var cancellables = Set<AnyCancellable>()
     private var isWaitingForFileOperationsBeforeTermination = false
@@ -18,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildMainMenu()
         statusBar = StatusBarController(delegate: self)
         appStore.onShowFileActivity = { [weak self] in self?.showFileActivity() }
+        appStore.onManagedItemsChanged = { [weak self] urls in
+            self?.widgetPublisher.publish(urls)
+        }
         desktopIntakeCoordinator = DesktopIntakeCoordinator(appStore: appStore)
         desktopIntakeCoordinator?.start()
         appStore.$panels
@@ -53,6 +57,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard urls.contains(where: { $0.scheme == "dfw-organizer" && $0.host == "open" }) else {
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.openFullPanel()
+        }
+    }
+
+    @objc func openFullPanel() {
+        guard let panel = appStore.panels.first else { return }
+        // Only a deliberate widget click opens the complete interactive AppKit panel.
+        panel.config.levelMode = .floating
+        panel.config.isHidden = false
+        if controllers[panel.id] == nil {
+            syncWindows(appStore.panels)
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        controllers[panel.id]?.window?.makeKeyAndOrderFront(nil)
     }
 
     @objc func newPanel() {

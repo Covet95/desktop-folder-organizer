@@ -7,7 +7,7 @@
 - 多个独立面板，支持桌面层与悬浮置顶模式
 - 文件和文件夹图标网格、拖拽排序、搜索、打开、Finder 定位和快速预览
 - 面板尺寸、位置、列数和位置锁定设置
-- 面板使用 macOS 27 原生 Clear Liquid Glass，不叠加自定义背景色或透明度；图标、文字和工具栏作为玻璃内容保持清晰
+- 桌面使用 WidgetKit 原生系统小组件显示整理目录摘要，跟随 macOS 的 Clear/Tinted/Full Color 外观；点击后打开完整 AppKit 文件管理面板
 - 面板使用 macOS 语义色和原生 Popover 悬浮材质，随系统浅色/深色外观切换
 - 菜单栏入口、全局显示/隐藏快捷键和登录启动选项
 - 面板配置持久化
@@ -86,7 +86,7 @@ CODESIGN_IDENTITY="Developer ID Application: <证书名称>" ./build.sh
 
 ## 测试
 
-- test.sh：运行 AppStore 集成测试、PanelStateRepository 独立测试和 FileOperationService 独立测试；均使用临时目录
+- test.sh：运行 AppStore、PanelStateRepository、FileOperationService 以及 WidgetSnapshot 数据测试；均使用临时目录
 - `./snapshot.sh`：会创建 UI 窗口并在 `/tmp` 写入截图
 - `./feature_tests.sh`：包含 Quick Look 窗口和全局快捷键测试，不适合在用户正在工作的桌面上无提示执行
 
@@ -96,3 +96,11 @@ CODESIGN_IDENTITY="Developer ID Application: <证书名称>" ./build.sh
 - 最低 macOS 版本：以 `Info.plist` 为准
 - 版本号：`CFBundleShortVersionString`
 - 构建号：`CFBundleVersion`
+
+## WidgetKit + AppKit 双层模式
+
+- 在 macOS 27 桌面编辑小组件中添加「文档整理」，提供小、中、大三种尺寸；WidgetKit 小组件的刷新由系统调度，不保证逐秒实时
+- 小组件只读取主应用写入共享 App Group 的文件名与计数摘要；不直接移动、删除或访问原始文件
+- 点击小组件打开交互式 AppKit 面板；历史自动收纳、文件恢复、拖放与搜索逻辑不变
+- 在菜单栏「文档整理」中选择「显示/隐藏全部面板」可以隐藏旧桌面面板，避免与 WidgetKit 小组件叠放
+- App Group 为 group.com.covet.DesktopFolderWidget；WidgetKit 数据共享需要由同一 Apple 开发团队签名、启用并注册该 App Group。Ad-hoc 虽能编译和登记扩展，但不能保证运行或访问共享容器。当前开发机没有 Apple Development 证书，尚未完成真实小组件数据验收
