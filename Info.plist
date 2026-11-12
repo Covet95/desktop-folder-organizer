@@ -18,10 +18,14 @@
 	<string>文档整理</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.0</string>
+	<string>0.2.8</string>
 	<key>CFBundleVersion</key>
-	<string>13</string>
+	<string>21</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>27.2</string>
 	<key>CFBundleURLTypes</key>
@@ -34,7 +38,7 @@
 		</dict>
 	</array>
 	<key>LSUIElement</key>
-	<true/>
+	<false/>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>需要监控桌面项目，并在文件稳定后自动移动到文档整理目录。</string>
 	<key>NSDocumentsFolderUsageDescription</key>

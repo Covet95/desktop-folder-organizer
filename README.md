@@ -59,22 +59,21 @@
 
 ## 构建
 
-构建需要 macOS、Swift 编译器和 Xcode Command Line Tools；若要使用免费 Personal Team 的 Apple Development 签名，还需要安装完整 Xcode 并在 Accounts 中登录 Apple Account。
+构建需要 macOS 27.2+ 和完整 Xcode。主应用由 `swiftc` 编译，WidgetKit Extension 通过 Xcode 原生 target 构建。WidgetKit 扩展依赖 Xcode 提供的 ExtensionKit 入口和链接配置，不再使用独立的 `swiftc` 命令直接链接。
 
-默认构建 Universal Binary（Apple Silicon + Intel），最低系统版本从 `Info.plist` 的 `LSMinimumSystemVersion` 读取：
+当前 Mac 默认构建 `arm64`；最低系统版本从 `Info.plist` 的 `LSMinimumSystemVersion` 读取：
 
 ```bash
 ./build.sh
 ```
 
-只构建单一架构：
+只有需要同时兼容 Apple Silicon 和 Intel 设备时，才显式构建 Universal Binary：
 
 ```bash
-ARCHS=arm64 ./build.sh
-ARCHS=x86_64 ./build.sh
+ARCHS=universal ./build.sh
 ```
 
-构建脚本先在临时目录完成编译、签名和校验，成功后才替换旧的 `build/文档整理.app`。因此编译失败不会先删除现有应用。
+构建脚本在临时目录完成主应用编译、Xcode WidgetKit 构建、App Group 配置、签名和校验，成功后才替换旧的 `build/文档整理.app`。编译失败不会先删除现有应用。
 
 默认使用 Ad-hoc 签名，仅用于本机预览；此时不能据此验收主应用与 WidgetKit 的 App Group 数据共享。
 
@@ -103,6 +102,7 @@ CODESIGN_IDENTITY="Apple Development: <证书名称> (<你的10位Team ID>)" \
 
 ## 版本与平台
 
+- 当前版本：`0.2.8`（构建号 `21`）
 - Bundle ID：`com.covet.DesktopFolderWidget`
 - 最低 macOS 版本：以 `Info.plist` 为准
 - 版本号：`CFBundleShortVersionString`
