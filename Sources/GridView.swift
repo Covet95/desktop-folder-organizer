@@ -6,7 +6,7 @@ final class GridView: NSView {
     private(set) var itemViews: [ItemView] = []
     private var addTile: AddTileView?
     private var labelColor: NSColor = PanelAppearance.primaryText
-    private var groupedSections: [(header: NSTextField, range: Range<Int>)] = []
+    private var groupedSections: [(header: PanelSectionHeaderView, range: Range<Int>)] = []
     private var typeGrouping = false
 
     var onAddRequested: (() -> Void)?
@@ -28,9 +28,6 @@ final class GridView: NSView {
         for view in itemViews {
             view.setLabelColor(color)
         }
-        for section in groupedSections {
-            section.header.textColor = PanelAppearance.secondaryText
-        }
         addTile?.setColor(color)
     }
 
@@ -50,10 +47,7 @@ final class GridView: NSView {
             for group in FileDisplayGroup.allCases {
                 guard let matching = buckets[group], !matching.isEmpty else { continue }
 
-                let header = NSTextField(labelWithString: "\(group.title) · \(matching.count)")
-                header.font = .systemFont(ofSize: 11, weight: .semibold)
-                header.textColor = PanelAppearance.secondaryText
-                header.isSelectable = false
+                let header = PanelSectionHeaderView(group: group, count: matching.count)
                 addSubview(header)
 
                 let start = itemViews.count
@@ -88,19 +82,21 @@ final class GridView: NSView {
         let width = bounds.width
         guard width > 0 else { return }
 
-        let columns = max(1, store.config.columns)
-        let spacingX: CGFloat = 8
-        let spacingY: CGFloat = 6
+        let columns = effectiveColumns(for: width)
+        let spacingX = PanelAppearance.Grid.columnSpacing
+        let spacingY = PanelAppearance.Grid.rowSpacing
         let cellWidth = max(1, (width - spacingX * CGFloat(columns - 1)) / CGFloat(columns))
-        let cellHeight: CGFloat = 76
+        let cellHeight = PanelAppearance.Grid.tileHeight
 
         var contentHeight: CGFloat
 
         if typeGrouping {
             var y: CGFloat = 0
             for section in groupedSections {
-                section.header.frame = CGRect(x: 2, y: y, width: max(0, width - 4), height: 19)
-                y += 24
+                section.header.frame = CGRect(
+                    x: 0, y: y, width: width, height: PanelAppearance.Grid.sectionHeaderHeight
+                )
+                y += PanelAppearance.Grid.sectionHeaderHeight + 6
                 for (localIndex, index) in section.range.enumerated() {
                     let row = localIndex / columns
                     let column = localIndex % columns
@@ -113,7 +109,8 @@ final class GridView: NSView {
                 }
                 let count = section.range.count
                 let rows = (count + columns - 1) / columns
-                y += CGFloat(rows) * cellHeight + CGFloat(max(0, rows - 1)) * spacingY + 13
+                y += CGFloat(rows) * cellHeight + CGFloat(max(0, rows - 1)) * spacingY
+                y += PanelAppearance.Grid.sectionGap
             }
             if let addTile {
                 addTile.frame = CGRect(x: 0, y: y, width: cellWidth, height: cellHeight)
@@ -152,6 +149,14 @@ final class GridView: NSView {
         panelView?.menu(for: event)
     }
 
+    /// The user-configured value is an upper bound. Narrow panels retain readable labels.
+    private func effectiveColumns(for width: CGFloat) -> Int {
+        let gap = PanelAppearance.Grid.columnSpacing
+        let minimum = PanelAppearance.Grid.minTileWidth
+        let fitting = Int(max(1, floor((width + gap) / (minimum + gap))))
+        return max(1, min(store.config.columns, fitting))
+    }
+
     func index(at point: NSPoint, itemCount: Int) -> Int {
         guard itemCount > 0 else { return 0 }
 
@@ -169,11 +174,11 @@ final class GridView: NSView {
             }?.offset ?? 0
         }
 
-        let columns = max(1, store.config.columns)
-        let spacingX: CGFloat = 8
-        let spacingY: CGFloat = 6
+        let columns = effectiveColumns(for: bounds.width)
+        let spacingX = PanelAppearance.Grid.columnSpacing
+        let spacingY = PanelAppearance.Grid.rowSpacing
         let cellWidth = max(1, (bounds.width - spacingX * CGFloat(columns - 1)) / CGFloat(columns))
-        let cellHeight: CGFloat = 76
+        let cellHeight = PanelAppearance.Grid.tileHeight
 
         let column = max(0, min(columns - 1, Int((point.x + spacingX / 2) / (cellWidth + spacingX))))
         let row = max(0, Int((point.y + spacingY / 2) / (cellHeight + spacingY)))

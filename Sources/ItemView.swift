@@ -25,7 +25,7 @@ final class ItemView: NSView, NSDraggingSource {
         super.init(frame: .zero)
 
         wantsLayer = true
-        layer?.cornerRadius = 9
+        layer?.cornerRadius = 12
         layer?.cornerCurve = .continuous
 
         iconView.image = IconProvider.shared.icon(for: item)
@@ -34,10 +34,13 @@ final class ItemView: NSView, NSDraggingSource {
         iconView.toolTip = item.name
         addSubview(iconView)
 
-        label.font = .systemFont(ofSize: 11)
+        label.font = PanelAppearance.Typography.fileName
         label.alignment = .center
         label.maximumNumberOfLines = 2
-        label.lineBreakMode = .byTruncatingTail
+        label.lineBreakMode = .byWordWrapping
+        label.cell?.usesSingleLineMode = false
+        label.cell?.wraps = true
+        label.cell?.truncatesLastVisibleLine = true
         label.isSelectable = false
         label.textColor = item.exists ? labelColor : PanelAppearance.tertiaryText
         label.toolTip = item.name
@@ -53,8 +56,11 @@ final class ItemView: NSView, NSDraggingSource {
 
     override func layout() {
         super.layout()
-        iconView.frame = CGRect(x: (bounds.width - 40) / 2, y: 3, width: 40, height: 40)
-        label.frame = CGRect(x: 2, y: 47, width: max(0, bounds.width - 4), height: 27)
+        let iconSize = min(PanelAppearance.Grid.iconSize, max(1, bounds.width - 8))
+        iconView.frame = CGRect(
+            x: (bounds.width - iconSize) / 2, y: 6, width: iconSize, height: iconSize
+        )
+        label.frame = CGRect(x: 3, y: 57, width: max(0, bounds.width - 6), height: 32)
     }
 
     func setLabelColor(_ color: NSColor) {

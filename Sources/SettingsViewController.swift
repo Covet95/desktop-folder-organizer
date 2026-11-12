@@ -20,7 +20,7 @@ final class SettingsViewController: NSViewController {
         self.store = store
         self.appStore = appStore
         super.init(nibName: nil, bundle: nil)
-        preferredContentSize = NSSize(width: 320, height: 308)
+        preferredContentSize = NSSize(width: 336, height: 410)
     }
 
     required init?(coder: NSCoder) {
@@ -28,73 +28,91 @@ final class SettingsViewController: NSViewController {
     }
 
     override func loadView() {
-        let root = FlippedView(frame: NSRect(x: 0, y: 0, width: 320, height: 308))
+        let root = FlippedView(frame: NSRect(x: 0, y: 0, width: 336, height: 410))
         root.onAppearanceChanged = { [weak self] in
             guard let self else { return }
             self.update(self.store.config)
         }
         view = root
 
-        addLabel("面板设置", frame: CGRect(x: 18, y: 16, width: 284, height: 20), font: .systemFont(ofSize: 14, weight: .semibold))
-        addLabel("每行图标", frame: CGRect(x: 18, y: 50, width: 100, height: 18), font: .systemFont(ofSize: 12))
-        columnsStepper.frame = CGRect(x: 250, y: 47, width: 20, height: 24)
-        columnsStepper.controlSize = .small
+        addLabel("面板设置", frame: CGRect(x: 20, y: 14, width: 296, height: 24),
+                 font: PanelAppearance.Typography.settingsTitle)
+        addLabel("调整文件排列及窗口行为", frame: CGRect(x: 20, y: 41, width: 296, height: 17),
+                 font: PanelAppearance.Typography.settingsDetail, color: .secondaryLabelColor)
+        addSeparator(y: 64)
+
+        addLabel("内容布局", frame: CGRect(x: 20, y: 76, width: 296, height: 17),
+                 font: PanelAppearance.Typography.settingsSection, color: .secondaryLabelColor)
+
+        addLabel("每行最多图标", frame: CGRect(x: 20, y: 102, width: 174, height: 23),
+                 font: PanelAppearance.Typography.settingsLabel)
+        columnsStepper.frame = CGRect(x: 260, y: 100, width: 25, height: 26)
+        columnsStepper.controlSize = .regular
         columnsStepper.minValue = 3
         columnsStepper.maxValue = 7
         columnsStepper.increment = 1
         columnsStepper.target = self
         columnsStepper.action = #selector(columnsChanged(_:))
         root.addSubview(columnsStepper)
-        columnsValue.frame = CGRect(x: 274, y: 50, width: 28, height: 18)
+
+        columnsValue.frame = CGRect(x: 290, y: 102, width: 26, height: 22)
         columnsValue.alignment = .right
-        columnsValue.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        columnsValue.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium)
         root.addSubview(columnsValue)
 
-        addLabel("面板尺寸", frame: CGRect(x: 18, y: 88, width: 284, height: 16), font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
-        sizeControl.frame = CGRect(x: 18, y: 110, width: 284, height: 26)
-        sizeControl.controlSize = .small
-        sizeControl.target = self
-        sizeControl.action = #selector(sizeChanged(_:))
-        root.addSubview(sizeControl)
+        addLabel("窄面板自动减少列数，确保文件名可读", frame: CGRect(x: 20, y: 128, width: 296, height: 16),
+                 font: PanelAppearance.Typography.settingsDetail, color: .secondaryLabelColor)
 
-        addLabel("窗口层级", frame: CGRect(x: 18, y: 150, width: 284, height: 16), font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
-        levelControl.frame = CGRect(x: 18, y: 172, width: 284, height: 26)
-        levelControl.controlSize = .small
-        levelControl.target = self
-        levelControl.action = #selector(levelChanged(_:))
-        root.addSubview(levelControl)
-
-        lockCheckbox.frame = CGRect(x: 18, y: 208, width: 284, height: 20)
-        lockCheckbox.controlSize = .small
-        lockCheckbox.font = .systemFont(ofSize: 12)
-        lockCheckbox.target = self
-        lockCheckbox.action = #selector(lockChanged(_:))
-        root.addSubview(lockCheckbox)
-
-        groupCheckbox.frame = CGRect(x: 18, y: 236, width: 284, height: 20)
-        groupCheckbox.controlSize = .small
-        groupCheckbox.font = .systemFont(ofSize: 12)
+        groupCheckbox.frame = CGRect(x: 20, y: 152, width: 296, height: 24)
+        groupCheckbox.controlSize = .regular
+        groupCheckbox.font = PanelAppearance.Typography.settingsLabel
         groupCheckbox.target = self
         groupCheckbox.action = #selector(groupingChanged(_:))
         root.addSubview(groupCheckbox)
 
-        let separator = NSBox(frame: CGRect(x: 18, y: 269, width: 284, height: 1))
-        separator.boxType = .separator
-        root.addSubview(separator)
+        addSeparator(y: 184)
+        addLabel("窗口", frame: CGRect(x: 20, y: 195, width: 296, height: 17),
+                 font: PanelAppearance.Typography.settingsSection, color: .secondaryLabelColor)
 
-        let clearButton = NSButton(title: "清空失效条目", target: self, action: #selector(clearMissing))
-        clearButton.frame = CGRect(x: 18, y: 276, width: 128, height: 24)
-        clearButton.controlSize = .small
+        addLabel("面板尺寸", frame: CGRect(x: 20, y: 220, width: 296, height: 18),
+                 font: PanelAppearance.Typography.settingsLabel)
+        sizeControl.frame = CGRect(x: 20, y: 241, width: 296, height: 27)
+        sizeControl.controlSize = .regular
+        sizeControl.font = PanelAppearance.Typography.settingsLabel
+        sizeControl.target = self
+        sizeControl.action = #selector(sizeChanged(_:))
+        root.addSubview(sizeControl)
+
+        addLabel("窗口层级", frame: CGRect(x: 20, y: 278, width: 296, height: 18),
+                 font: PanelAppearance.Typography.settingsLabel)
+        levelControl.frame = CGRect(x: 20, y: 299, width: 296, height: 27)
+        levelControl.controlSize = .regular
+        levelControl.font = PanelAppearance.Typography.settingsLabel
+        levelControl.target = self
+        levelControl.action = #selector(levelChanged(_:))
+        root.addSubview(levelControl)
+
+        lockCheckbox.frame = CGRect(x: 20, y: 335, width: 296, height: 23)
+        lockCheckbox.controlSize = .regular
+        lockCheckbox.font = PanelAppearance.Typography.settingsLabel
+        lockCheckbox.target = self
+        lockCheckbox.action = #selector(lockChanged(_:))
+        root.addSubview(lockCheckbox)
+
+        addSeparator(y: 366)
+        let clearButton = NSButton(title: "清理失效项", target: self, action: #selector(clearMissing))
+        clearButton.frame = CGRect(x: 20, y: 374, width: 130, height: 28)
+        clearButton.controlSize = .regular
         clearButton.bezelStyle = .rounded
-        clearButton.font = .systemFont(ofSize: 11)
+        clearButton.font = PanelAppearance.Typography.button
         root.addSubview(clearButton)
 
         deleteButton.target = self
         deleteButton.action = #selector(deletePanel)
-        deleteButton.frame = CGRect(x: 208, y: 276, width: 94, height: 24)
-        deleteButton.controlSize = .small
+        deleteButton.frame = CGRect(x: 219, y: 374, width: 97, height: 28)
+        deleteButton.controlSize = .regular
         deleteButton.bezelStyle = .rounded
-        deleteButton.font = .systemFont(ofSize: 11)
+        deleteButton.font = PanelAppearance.Typography.button
         root.addSubview(deleteButton)
 
         store.$config
@@ -124,6 +142,12 @@ final class SettingsViewController: NSViewController {
         view.addSubview(label)
     }
 
+    private func addSeparator(y: CGFloat) {
+        let separator = NSBox(frame: CGRect(x: 20, y: y, width: 296, height: 1))
+        separator.boxType = .separator
+        view.addSubview(separator)
+    }
+
     private func update(_ config: PanelConfig) {
         columnsStepper.integerValue = config.columns
         columnsValue.stringValue = "\(config.columns)"
@@ -132,7 +156,6 @@ final class SettingsViewController: NSViewController {
         lockCheckbox.state = config.positionLocked ? .on : .off
         groupCheckbox.state = config.isTypeGroupingEnabled ? .on : .off
         deleteButton.isEnabled = appStore.canDeletePanel
-
     }
 
     @objc private func columnsChanged(_ sender: NSStepper) {

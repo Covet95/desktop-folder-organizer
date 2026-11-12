@@ -12,7 +12,7 @@ final class AddTileView: NSView {
     init() {
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 9
+        layer?.cornerRadius = 12
         layer?.cornerCurve = .continuous
         toolTip = "添加文件或文件夹（会移动原文件）"
     }
@@ -31,17 +31,18 @@ final class AddTileView: NSView {
 
         if isHovering {
             NSColor.quaternaryLabelColor.withAlphaComponent(0.16).setFill()
-            NSBezierPath(roundedRect: bounds, xRadius: 9, yRadius: 9).fill()
+            NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12).fill()
         }
 
-        let box = CGRect(x: (bounds.width - 40) / 2, y: 3, width: 40, height: 40)
-        let path = NSBezierPath(roundedRect: box, xRadius: 7, yRadius: 7)
+        let iconSize = min(PanelAppearance.Grid.iconSize, max(1, bounds.width - 8))
+        let box = CGRect(x: (bounds.width - iconSize) / 2, y: 6, width: iconSize, height: iconSize)
+        let path = NSBezierPath(roundedRect: box, xRadius: 11, yRadius: 11)
         path.lineWidth = 1
         path.setLineDash([3, 3], count: 2, phase: 0)
         NSColor.separatorColor.withAlphaComponent(isHovering ? 0.85 : 0.58).setStroke()
         path.stroke()
 
-        let plusColor = color.withAlphaComponent(isHovering ? 0.78 : 0.58)
+        let plusColor = color.withAlphaComponent(isHovering ? 1 : 0.82)
         plusColor.setStroke()
         let plus = NSBezierPath()
         plus.lineWidth = 1.4
@@ -53,12 +54,12 @@ final class AddTileView: NSView {
 
         let text = "添加" as NSString
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11),
+            .font: PanelAppearance.Typography.fileName,
             .foregroundColor: plusColor
         ]
         let size = text.size(withAttributes: attributes)
         text.draw(
-            at: CGPoint(x: (bounds.width - size.width) / 2, y: 47),
+            at: CGPoint(x: (bounds.width - size.width) / 2, y: 61),
             withAttributes: attributes
         )
     }

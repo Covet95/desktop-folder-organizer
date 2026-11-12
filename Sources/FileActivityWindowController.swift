@@ -52,11 +52,11 @@ private final class FileActivityViewController: NSViewController, NSTableViewDat
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 820, height: 520))
         view = root
 
-        statusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        statusLabel.font = PanelAppearance.Typography.activityTitle
         statusLabel.frame = NSRect(x: 20, y: 480, width: 780, height: 20)
         root.addSubview(statusLabel)
 
-        detailLabel.font = .systemFont(ofSize: 11)
+        detailLabel.font = PanelAppearance.Typography.secondary
         detailLabel.textColor = .secondaryLabelColor
         detailLabel.frame = NSRect(x: 20, y: 455, width: 780, height: 18)
         root.addSubview(detailLabel)
@@ -78,7 +78,10 @@ private final class FileActivityViewController: NSViewController, NSTableViewDat
         tableView.addTableColumn(fileColumn)
         tableView.addTableColumn(stateColumn)
         tableView.headerView = NSTableHeaderView()
-        tableView.rowHeight = 30
+        for column in tableView.tableColumns {
+            column.headerCell.font = .systemFont(ofSize: 12, weight: .medium)
+        }
+        tableView.rowHeight = 34
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.allowsEmptySelection = true
         tableView.allowsMultipleSelection = false
@@ -114,6 +117,11 @@ private final class FileActivityViewController: NSViewController, NSTableViewDat
         refreshButton.action = #selector(refresh)
         root.addSubview(refreshButton)
 
+        for button in [restoreButton, revealButton, refreshButton] {
+            button.font = PanelAppearance.Typography.button
+            button.controlSize = .regular
+        }
+
         appStore.$fileOperations
             .sink { [weak self] _ in self?.refresh() }
             .store(in: &cancellables)
@@ -147,9 +155,9 @@ private final class FileActivityViewController: NSViewController, NSTableViewDat
         cell.identifier = cellID
         let label = cell.textField ?? NSTextField(labelWithString: "")
         label.stringValue = text
-        label.font = .systemFont(ofSize: 11)
+        label.font = PanelAppearance.Typography.activityRow
         label.lineBreakMode = .byTruncatingMiddle
-        label.frame = NSRect(x: 5, y: 5, width: max(40, (tableColumn?.width ?? 100) - 10), height: 20)
+        label.frame = NSRect(x: 7, y: 7, width: max(40, (tableColumn?.width ?? 100) - 14), height: 21)
         if cell.textField == nil {
             cell.addSubview(label)
             cell.textField = label

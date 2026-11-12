@@ -24,7 +24,7 @@ final class PanelEmptyStateView: NSView {
         messageLabel.isSelectable = false
         messageLabel.isBezeled = false
         messageLabel.drawsBackground = false
-        messageLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        messageLabel.font = .systemFont(ofSize: 14, weight: .medium)
         addSubview(messageLabel)
 
         actionButton.isBordered = false
@@ -60,7 +60,7 @@ final class PanelEmptyStateView: NSView {
         actionButton.attributedTitle = NSAttributedString(
             string: actionButton.title,
             attributes: [
-                .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+                .font: NSFont.systemFont(ofSize: 13, weight: .medium),
                 .foregroundColor: NSColor.controlAccentColor
             ]
         )
@@ -69,9 +69,9 @@ final class PanelEmptyStateView: NSView {
 
     override func layout() {
         super.layout()
-        iconView.frame = CGRect(x: bounds.midX - 14, y: bounds.midY - 42, width: 28, height: 28)
-        messageLabel.frame = CGRect(x: 0, y: bounds.midY - 6, width: bounds.width, height: 16)
-        actionButton.frame = CGRect(x: 0, y: bounds.midY + 14, width: bounds.width, height: 20)
+        iconView.frame = CGRect(x: bounds.midX - 18, y: bounds.midY - 54, width: 36, height: 36)
+        messageLabel.frame = CGRect(x: 0, y: bounds.midY - 10, width: bounds.width, height: 21)
+        actionButton.frame = CGRect(x: 0, y: bounds.midY + 24, width: bounds.width, height: 23)
     }
 
     @objc private func didTapAction() {

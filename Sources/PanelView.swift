@@ -92,6 +92,9 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         scrollView.documentView = gridView
         contentRoot.addSubview(scrollView)
 
+        toolbarView.onBackgroundMouseDown = { [weak self] in
+            self?.beginWindowDrag(with: $0)
+        }
         toolbarView.onSearchChanged = { [weak store] in store?.searchText = $0 }
         toolbarView.onSearchRequested = { [weak self] in
             if self?.store.isSearchVisible == true {
@@ -245,6 +248,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         let searching = isSearchActive
 
         gridView.reload(items: items, isSearching: searching, groupByType: store.config.isTypeGroupingEnabled)
+        toolbarView.setItemCount(items.count)
         updateEmptyState(items: items, searching: searching)
         gridView.needsLayout = true
         needsLayout = true
@@ -311,10 +315,10 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
     override func layout() {
         super.layout()
 
-        let padding: CGFloat = 12
-        let topY: CGFloat = 10
-        let topHeight: CGFloat = 22
-        let contentY = topY + topHeight + 8
+        let padding: CGFloat = 14
+        let topY: CGFloat = 9
+        let topHeight: CGFloat = 28
+        let contentY = topY + topHeight + 10
         let contentWidth = max(0, bounds.width - padding * 2)
         let contentHeight = max(0, bounds.height - contentY - padding)
         let contentRect = CGRect(x: padding, y: contentY, width: contentWidth, height: contentHeight)
@@ -324,7 +328,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         gridView.frame.size.width = scrollView.contentSize.width
         gridView.needsLayout = true
 
-        toolbarView.frame = CGRect(x: padding, y: topY, width: contentWidth, height: 24)
+        toolbarView.frame = CGRect(x: padding, y: topY, width: contentWidth, height: topHeight)
 
         emptyStateView.frame = contentRect
     }
