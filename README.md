@@ -1,13 +1,12 @@
 # 文档整理
 
-一个基于 Swift + AppKit 的 macOS 桌面文件整理应用。它以独立菜单栏应用运行，保留可自由摆放的 AppKit 文件管理面板，并通过 WidgetKit 在桌面显示整理目录摘要。
+一个基于 Swift + AppKit 的 macOS 个人桌面文件整理应用。它以独立菜单栏应用运行，提供可自由摆放的 AppKit 文件管理面板。原生 WidgetKit 系统小组件未能在桌面图库完成验收，已从本机使用版中移除；此前实验保留在 Git 历史及标签 `widgetkit-experiment-v0.2.9`。
 
 ## 当前能力
 
 - 多个独立面板，支持桌面层与悬浮置顶模式
 - 文件和文件夹图标网格、拖拽排序、搜索、打开、Finder 定位和快速预览
 - 面板尺寸、位置、列数和位置锁定设置
-- 桌面使用 WidgetKit 原生系统小组件显示整理目录摘要，跟随 macOS 的 Clear/Tinted/Full Color 外观；点击后打开完整 AppKit 文件管理面板
 - 面板使用 macOS 语义色和原生 Popover 悬浮材质，随系统浅色/深色外观切换
 - 菜单栏入口、全局显示/隐藏快捷键和登录启动选项
 - 面板配置持久化
@@ -59,59 +58,42 @@
 
 ## 构建
 
-构建需要 macOS 27.2+ 和完整 Xcode。主应用由 `swiftc` 编译，WidgetKit Extension 通过 Xcode 原生 target 构建。WidgetKit 扩展依赖 Xcode 提供的 ExtensionKit 入口和链接配置，不再使用独立的 `swiftc` 命令直接链接。
-
-当前 Mac 默认构建 `arm64`；最低系统版本从 `Info.plist` 的 `LSMinimumSystemVersion` 读取：
+构建需要 macOS、Swift 编译器和 Xcode Command Line Tools（或完整 Xcode）。当前只构建 AppKit 主应用，不需要 WidgetKit Extension、App Group 或单独的 Xcode 小组件工程。
 
 ```bash
 ./build.sh
 ```
 
-只有需要同时兼容 Apple Silicon 和 Intel 设备时，才显式构建 Universal Binary：
+默认构建 Apple Silicon `arm64`；只有需要兼容 Intel 时才运行：
 
 ```bash
 ARCHS=universal ./build.sh
 ```
 
-构建脚本在临时目录完成主应用编译、Xcode WidgetKit 构建、App Group 配置、签名和校验，成功后才替换旧的 `build/文档整理.app`。编译失败不会先删除现有应用。
-
-默认使用 Ad-hoc 签名，仅用于本机预览；此时不能据此验收主应用与 WidgetKit 的 App Group 数据共享。
-
-**免费 Apple Account 本机签名：**
-
-1. 安装完整 Xcode，在 Xcode > Settings > Accounts 中添加自己的 Apple Account。
-2. 选择 Personal Team，并在 Manage Certificates 中创建 Apple Development 证书。
-3. 从 Xcode 账户信息取得 Team ID；在终端执行 `security find-identity -v -p codesigning`，确认 Apple Development 身份已出现在钥匙串。
-4. 使用同一个 Team ID 和 Apple Development 身份构建：
+如需用现有免费 Apple Development 证书进行本机签名，可指定钥匙串中的身份：
 
 ```bash
-TEAM_ID="<你的10位Team ID>" \
-CODESIGN_IDENTITY="Apple Development: <证书名称> (<你的10位Team ID>)" \
-./build.sh
+CODESIGN_IDENTITY="<钥匙串中可用的 Apple Development 身份>" ./build.sh
 ```
 
-构建脚本会为主应用和 Widget Extension 写入相同的 macOS App Group 标识：`<Team ID>.com.covet.DesktopFolderWidget`。这种 macOS 团队 ID 前缀形式不需要在开发者网站注册 App Group，也不需要为该 App Group 单独配置预置描述文件；签名代码的 Team ID 必须与标识前缀一致。参见 [Apple：Accessing app group containers](https://developer.apple.com/documentation/xcode/accessing-app-group-containers)。
-
-该方案仅用于自己的 Mac 本机开发和使用，不提供 App Store 上架、Developer ID 分发或公证能力。签名身份必须存在于当前 Mac 的钥匙串中。
+不指定签名身份时使用 Ad-hoc 签名，供本机调试。构建脚本先编译、签名、验证，再替换 `build/文档整理.app`，失败时保留原构建产物。
 
 ## 测试
 
-- test.sh：运行 AppStore、PanelStateRepository、FileOperationService 以及 WidgetSnapshot 数据测试；均使用临时目录
+- `./test.sh`：运行 AppStore、PanelStateRepository 和 FileOperationService 数据测试；均使用临时目录
 - `./snapshot.sh`：会创建 UI 窗口并在 `/tmp` 写入截图
 - `./feature_tests.sh`：包含 Quick Look 窗口和全局快捷键测试，不适合在用户正在工作的桌面上无提示执行
 
 ## 版本与平台
 
-- 当前版本：`0.2.8`（构建号 `21`）
+- 当前版本：`0.2.10`（构建号 `23`）
 - Bundle ID：`com.covet.DesktopFolderWidget`
 - 最低 macOS 版本：以 `Info.plist` 为准
 - 版本号：`CFBundleShortVersionString`
 - 构建号：`CFBundleVersion`
 
-## WidgetKit + AppKit 双层模式
+## 本机使用范围
 
-- 在 macOS 27 桌面编辑小组件中添加「文档整理」，提供小、中、大三种尺寸；WidgetKit 小组件的刷新由系统调度，不保证逐秒实时
-- 小组件只读取主应用写入共享 App Group 的文件名与计数摘要；不直接移动、删除或访问原始文件
-- 点击小组件打开交互式 AppKit 面板；历史自动收纳、文件恢复、拖放与搜索逻辑不变
-- 在菜单栏「文档整理」中选择「显示/隐藏全部面板」可以隐藏旧桌面面板，避免与 WidgetKit 小组件叠放
-- 主应用和 Widget Extension 通过 App Group 共享摘要文件；免费 Personal Team 本机开发使用 macOS 团队 ID 前缀标识 `<Team ID>.com.covet.DesktopFolderWidget`。Ad-hoc 签名只用于预览，不能作为共享容器验收依据；必须使用同一 Personal Team 的 Apple Development 身份签署两个 bundle
+- 本版本使用可拖动的 AppKit 桌面整理面板和菜单栏入口，不会出现在 macOS「编辑小组件」系统图库
+- 文件整理、恢复日志和面板配置的数据目录沿用原位置，不做迁移
+- WidgetKit 试验工程、专用 URL Scheme、App Group 权限和摘要发布逻辑已退役；可从 Git 历史恢复，不影响现有 AppKit 功能

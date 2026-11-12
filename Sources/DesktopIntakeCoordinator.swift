@@ -169,7 +169,6 @@ final class DesktopIntakeCoordinator {
             return
         }
         appStore.panels.first?.synchronizeManagedItems(urls, directory: directory)
-        appStore.onManagedItemsChanged?(urls)
     }
 
     private func absorbDesktopItems(

@@ -36,12 +36,3 @@ swiftc -swift-version 5 -parse-as-library \
     Tests/FileOperationServiceTests.swift \
     -o build/FileOperationServiceTests
 ./build/FileOperationServiceTests
-
-
-echo
-echo "=== WIDGET SUMMARY DATA TESTS ==="
-swiftc -swift-version 5 -parse-as-library \
-    Shared/WidgetSnapshot.swift \
-    Tests/WidgetSnapshotTests.swift \
-    -o build/WidgetSnapshotTests
-./build/WidgetSnapshotTests
