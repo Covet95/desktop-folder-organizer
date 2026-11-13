@@ -16,7 +16,6 @@ enum PanelAppearance {
     static var itemDrop: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.20) }
     static var itemDropBorder: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.75) }
     static var sectionRule: NSColor { NSColor.separatorColor.withAlphaComponent(0.36) }
-    static var panelHairline: NSColor { NSColor.separatorColor.withAlphaComponent(0.24) }
 
     enum Typography {
         static var toolbarTitle: NSFont { .systemFont(ofSize: 13, weight: .semibold) }

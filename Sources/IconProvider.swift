@@ -69,10 +69,6 @@ final class IconProvider {
         return value
     }
 
-    func icon(for item: WidgetItem) -> NSImage {
-        icon(for: item, metadata: metadata(for: item))
-    }
-
     func icon(for item: WidgetItem, metadata: FileMetadata) -> NSImage {
         guard metadata.exists else { return missingIcon }
 
@@ -135,11 +131,6 @@ final class IconProvider {
                 }
             }
         }
-    }
-
-    func invalidate(path: String) {
-        metadataCache.removeValue(forKey: path)
-        iconCache.removeObject(forKey: path as NSString)
     }
 
     private func thumbnailKey(for path: String, timestamp: TimeInterval) -> String {

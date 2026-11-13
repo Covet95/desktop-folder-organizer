@@ -124,34 +124,15 @@ struct WidgetItem: Codable, Identifiable, Equatable {
     var displayGroup: FileDisplayGroup { FileDisplayGroup.forItem(self) }
 }
 
-enum PanelLevelMode: String, Codable, CaseIterable, Identifiable {
+enum PanelLevelMode: String, Codable {
     case desktop
     case floating
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .desktop: return "桌面层"
-        case .floating: return "悬浮置顶"
-        }
-    }
 }
 
-enum PanelAppearanceMode: String, Codable, CaseIterable, Identifiable {
+enum PanelAppearanceMode: String, Codable {
     case system
     case light
     case dark
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .system: return "自动"
-        case .light: return "浅色"
-        case .dark: return "深色"
-        }
-    }
 }
 
 struct PanelConfig: Codable, Identifiable, Equatable {

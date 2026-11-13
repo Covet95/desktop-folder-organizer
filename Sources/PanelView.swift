@@ -62,8 +62,8 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         contentRoot.canResizeFromCorner = { [weak self] in
             self?.store.config.positionLocked == false
         }
-        contentRoot.onCornerResize = { [weak self] event in
-            self?.beginCornerResize(with: event)
+        contentRoot.onCornerResize = { [weak self] in
+            self?.beginCornerResize()
         }
         contentRoot.onBackgroundMouseDown = { [weak self] in
             self?.beginWindowDrag(with: $0)
@@ -323,7 +323,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         onWindowDragEnded?()
     }
 
-    private func beginCornerResize(with startEvent: NSEvent) {
+    private func beginCornerResize() {
         guard let window, !store.config.positionLocked else { return }
         window.makeKey()
 
@@ -473,7 +473,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
 
 private final class PanelContentView: NSView {
     var canResizeFromCorner: (() -> Bool)?
-    var onCornerResize: ((NSEvent) -> Void)?
+    var onCornerResize: (() -> Void)?
     var onBackgroundMouseDown: ((NSEvent) -> Void)?
     var onMenuRequested: ((NSEvent) -> NSMenu?)?
     var onDraggingEntered: ((NSDraggingInfo) -> NSDragOperation)?
@@ -498,7 +498,7 @@ private final class PanelContentView: NSView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         if canResizeFromCorner?() == true, cornerResizeRect.contains(point) {
-            onCornerResize?(event)
+            onCornerResize?()
             return
         }
         onBackgroundMouseDown?(event)

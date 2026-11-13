@@ -198,8 +198,7 @@ final class AppStore: ObservableObject {
         autoAbsorbStatus = AutoAbsorbStatus(
             phase: phase,
             pendingCount: pendingCount,
-            message: message,
-            updatedAt: Date()
+            message: message
         )
     }
 

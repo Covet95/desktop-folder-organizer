@@ -20,7 +20,6 @@ struct AutoAbsorbStatus: Equatable {
     var phase: AutoAbsorbPhase = .monitoring
     var pendingCount: Int = 0
     var message: String = "等待桌面文件变化"
-    var updatedAt: Date = Date()
 
     var detail: String {
         switch phase {
