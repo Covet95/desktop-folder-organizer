@@ -166,14 +166,14 @@ final class GridView: NSView {
             }
             if let addTile {
                 if addTile.isCompactBanner {
-                    addTile.frame = CGRect(x: 0, y: y, width: width, height: 34)
-                    y += 34 + 6
+                    addTile.frame = CGRect(x: 0, y: y, width: width, height: 36)
+                    y += 36 + 12
                 } else {
                     addTile.frame = CGRect(x: 0, y: y, width: cellWidth, height: cellHeight)
-                    y += cellHeight + 4
+                    y += cellHeight + 12
                 }
             }
-            contentHeight = max(y, 4)
+            contentHeight = max(y, 12)
         } else {
             var views: [NSView] = itemViews
             if let addTile { views.append(addTile) }
@@ -189,7 +189,7 @@ final class GridView: NSView {
                 )
             }
             let rows = max(1, (views.count + columns - 1) / columns)
-            contentHeight = CGFloat(rows) * cellHeight + CGFloat(max(0, rows - 1)) * spacingY + 4
+            contentHeight = CGFloat(rows) * cellHeight + CGFloat(max(0, rows - 1)) * spacingY + 12
         }
 
         let height = max(contentHeight, superview?.bounds.height ?? 0)

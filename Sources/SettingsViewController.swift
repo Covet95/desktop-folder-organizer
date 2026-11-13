@@ -45,10 +45,10 @@ final class SettingsViewController: NSViewController {
         root.addSubview(mainStack)
 
         NSLayoutConstraint.activate([
-            root.widthAnchor.constraint(equalToConstant: 340),
+            root.widthAnchor.constraint(equalToConstant: 344),
             mainStack.topAnchor.constraint(equalTo: root.topAnchor, constant: 16),
-            mainStack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
-            mainStack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
+            mainStack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
+            mainStack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
             mainStack.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16)
         ])
 
@@ -65,12 +65,12 @@ final class SettingsViewController: NSViewController {
         headerStack.addArrangedSubview(subtitleLabel)
         mainStack.addArrangedSubview(headerStack)
 
-        addSeparator(to: mainStack)
-
-        // Content Layout Section
+        // Content Layout Section Card
+        mainStack.setCustomSpacing(10, after: headerStack)
         mainStack.addArrangedSubview(
             makeLabel("内容布局", font: PanelAppearance.Typography.settingsSection, color: .secondaryLabelColor)
         )
+        let layoutCard = makeSectionCard(spacing: 8)
 
         let columnsRow = NSStackView()
         columnsRow.orientation = .horizontal
@@ -89,64 +89,75 @@ final class SettingsViewController: NSViewController {
         columnsStepper.action = #selector(columnsChanged(_:))
 
         columnsValue.alignment = .right
-        columnsValue.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium)
+        columnsValue.font = .monospacedDigitSystemFont(ofSize: 12.5, weight: .semibold)
         columnsValue.widthAnchor.constraint(greaterThanOrEqualToConstant: 32).isActive = true
 
         columnsRow.addArrangedSubview(columnsLabel)
         columnsRow.addArrangedSubview(columnsSpacer)
         columnsRow.addArrangedSubview(columnsStepper)
         columnsRow.addArrangedSubview(columnsValue)
-        mainStack.addArrangedSubview(columnsRow)
-        columnsRow.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
+        layoutCard.stack.addArrangedSubview(columnsRow)
+        columnsRow.widthAnchor.constraint(equalTo: layoutCard.stack.widthAnchor).isActive = true
 
         let columnsHint = makeLabel(
             "窄面板会自动减少显示列数，优先保证文件名完整可读",
             font: PanelAppearance.Typography.settingsDetail,
             color: .secondaryLabelColor
         )
-        mainStack.setCustomSpacing(4, after: columnsRow)
-        mainStack.addArrangedSubview(columnsHint)
+        layoutCard.stack.setCustomSpacing(4, after: columnsRow)
+        layoutCard.stack.addArrangedSubview(columnsHint)
 
         groupCheckbox.controlSize = .regular
         groupCheckbox.font = PanelAppearance.Typography.settingsLabel
         groupCheckbox.target = self
         groupCheckbox.action = #selector(groupingChanged(_:))
-        mainStack.addArrangedSubview(groupCheckbox)
+        layoutCard.stack.setCustomSpacing(10, after: columnsHint)
+        layoutCard.stack.addArrangedSubview(groupCheckbox)
 
-        addSeparator(to: mainStack)
+        mainStack.setCustomSpacing(6, after: mainStack.arrangedSubviews.last!)
+        mainStack.addArrangedSubview(layoutCard.card)
+        layoutCard.card.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
 
-        // Window & Appearance Section
-        mainStack.addArrangedSubview(
-            makeLabel("窗口与外观", font: PanelAppearance.Typography.settingsSection, color: .secondaryLabelColor)
+        // Window & Appearance Section Card
+        mainStack.setCustomSpacing(12, after: layoutCard.card)
+        let appearanceSectionLabel = makeLabel(
+            "窗口与外观",
+            font: PanelAppearance.Typography.settingsSection,
+            color: .secondaryLabelColor
         )
+        mainStack.addArrangedSubview(appearanceSectionLabel)
+        let appearanceCard = makeSectionCard(spacing: 10)
 
         sizeControl.controlSize = .regular
         sizeControl.font = PanelAppearance.Typography.settingsLabel
         sizeControl.target = self
         sizeControl.action = #selector(sizeChanged(_:))
-        addControlRow(title: "面板尺寸", control: sizeControl, to: mainStack)
+        addControlRow(title: "面板尺寸", control: sizeControl, to: appearanceCard.stack)
 
         levelControl.controlSize = .regular
         levelControl.font = PanelAppearance.Typography.settingsLabel
         levelControl.target = self
         levelControl.action = #selector(levelChanged(_:))
-        addControlRow(title: "窗口层级", control: levelControl, to: mainStack)
+        addControlRow(title: "窗口层级", control: levelControl, to: appearanceCard.stack)
 
         appearanceControl.controlSize = .regular
         appearanceControl.font = PanelAppearance.Typography.settingsLabel
         appearanceControl.target = self
         appearanceControl.action = #selector(appearanceChanged(_:))
-        addControlRow(title: "面板外观", control: appearanceControl, to: mainStack)
+        addControlRow(title: "面板外观", control: appearanceControl, to: appearanceCard.stack)
 
         lockCheckbox.controlSize = .regular
         lockCheckbox.font = PanelAppearance.Typography.settingsLabel
         lockCheckbox.target = self
         lockCheckbox.action = #selector(lockChanged(_:))
-        mainStack.addArrangedSubview(lockCheckbox)
+        appearanceCard.stack.addArrangedSubview(lockCheckbox)
 
-        addSeparator(to: mainStack)
+        mainStack.setCustomSpacing(6, after: appearanceSectionLabel)
+        mainStack.addArrangedSubview(appearanceCard.card)
+        appearanceCard.card.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
 
         // Footer actions
+        mainStack.setCustomSpacing(14, after: appearanceCard.card)
         let actionsRow = NSStackView()
         actionsRow.orientation = .horizontal
         actionsRow.alignment = .centerY
@@ -201,12 +212,21 @@ final class SettingsViewController: NSViewController {
         return label
     }
 
-    private func addSeparator(to stack: NSStackView) {
-        let separator = NSBox()
-        separator.boxType = .separator
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(separator)
-        separator.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    private func makeSectionCard(spacing: CGFloat) -> (card: NSView, stack: NSStackView) {
+        let card = SettingsCardView()
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = spacing
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 12),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 12),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -12),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -12)
+        ])
+        return (card, stack)
     }
 
     private func addControlRow(
@@ -324,6 +344,34 @@ final class SettingsViewController: NSViewController {
                 self?.onDelete?()
             }
         }
+    }
+}
+
+private final class SettingsCardView: NSView {
+    override var isFlipped: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 10
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 0.5
+        translatesAutoresizingMaskIntoConstraints = false
+        applyColors()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyColors()
+    }
+
+    private func applyColors() {
+        layer?.backgroundColor = resolvedCGColor(PanelAppearance.cardFill)
+        layer?.borderColor = resolvedCGColor(PanelAppearance.cardBorder)
     }
 }
 

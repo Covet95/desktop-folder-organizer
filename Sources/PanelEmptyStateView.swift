@@ -19,35 +19,39 @@ final class PanelEmptyStateView: NSView {
         super.init(frame: frameRect)
 
         iconBadge.wantsLayer = true
-        iconBadge.layer?.cornerRadius = 14
+        iconBadge.layer?.cornerRadius = 16
         iconBadge.layer?.cornerCurve = .continuous
         iconBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
+        iconBadge.layer?.borderWidth = 0.5
+        iconBadge.layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
         iconBadge.translatesAutoresizingMaskIntoConstraints = false
 
         iconView.imageScaling = .scaleProportionallyDown
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconBadge.addSubview(iconView)
         NSLayoutConstraint.activate([
-            iconBadge.widthAnchor.constraint(equalToConstant: 48),
-            iconBadge.heightAnchor.constraint(equalToConstant: 48),
+            iconBadge.widthAnchor.constraint(equalToConstant: 54),
+            iconBadge.heightAnchor.constraint(equalToConstant: 54),
             iconView.centerXAnchor.constraint(equalTo: iconBadge.centerXAnchor),
             iconView.centerYAnchor.constraint(equalTo: iconBadge.centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 24),
-            iconView.heightAnchor.constraint(equalToConstant: 24)
+            iconView.widthAnchor.constraint(equalToConstant: 26),
+            iconView.heightAnchor.constraint(equalToConstant: 26)
         ])
 
         titleLabel.alignment = .center
         titleLabel.maximumNumberOfLines = 1
-        titleLabel.font = .systemFont(ofSize: 13.5, weight: .semibold)
+        titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         titleLabel.lineBreakMode = .byTruncatingTail
 
         subtitleLabel.alignment = .center
         subtitleLabel.maximumNumberOfLines = 2
         subtitleLabel.font = PanelAppearance.Typography.secondary
         subtitleLabel.lineBreakMode = .byWordWrapping
+        subtitleLabel.preferredMaxLayoutWidth = 236
 
         actionButton.bezelStyle = .rounded
         actionButton.controlSize = .regular
+        actionButton.imagePosition = .imageLeading
         actionButton.target = self
         actionButton.action = #selector(didTapAction)
 
@@ -87,14 +91,16 @@ final class PanelEmptyStateView: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         iconBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
+        iconBadge.layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
     }
 
     private func updateContent() {
         let symbolName = isSearching ? "doc.text.magnifyingglass" : "folder.badge.plus"
         iconView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: 20, weight: .medium))
+            .withSymbolConfiguration(.init(pointSize: 22, weight: .medium))
         iconView.contentTintColor = secondaryColor
         iconBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
+        iconBadge.layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
 
         titleLabel.stringValue = isSearching ? "没有匹配的文件" : "面板为空"
         titleLabel.textColor = primaryColor
@@ -105,6 +111,10 @@ final class PanelEmptyStateView: NSView {
         subtitleLabel.textColor = secondaryColor
 
         actionButton.title = isSearching ? "清除搜索" : "选择并移动文件…"
+        actionButton.image = NSImage(
+            systemSymbolName: isSearching ? "xmark.circle" : "plus.circle.fill",
+            accessibilityDescription: nil
+        )?.withSymbolConfiguration(.init(pointSize: 12.5, weight: .medium))
         actionButton.font = PanelAppearance.Typography.button
     }
 

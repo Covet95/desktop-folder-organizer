@@ -35,12 +35,19 @@ final class ItemView: NSView, NSDraggingSource {
         layer?.cornerCurve = .continuous
 
         iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.wantsLayer = true
+        iconView.layer?.masksToBounds = false
+        iconView.layer?.shadowColor = NSColor.black.cgColor
+        iconView.layer?.shadowOpacity = 0.16
+        iconView.layer?.shadowRadius = 3.5
+        iconView.layer?.shadowOffset = CGSize(width: 0, height: -1.5)
         addSubview(iconView)
 
         label.font = PanelAppearance.Typography.fileName
         label.alignment = .center
         label.maximumNumberOfLines = 2
-        label.lineBreakMode = .byCharWrapping
+        label.lineBreakMode = .byWordWrapping
+        label.allowsDefaultTighteningForTruncation = true
         label.cell?.usesSingleLineMode = false
         label.cell?.wraps = true
         label.cell?.truncatesLastVisibleLine = true
@@ -123,7 +130,7 @@ final class ItemView: NSView, NSDraggingSource {
         iconView.frame = CGRect(
             x: (bounds.width - iconSize) / 2, y: 7, width: iconSize, height: iconSize
         )
-        label.frame = CGRect(x: 3, y: 55, width: max(0, bounds.width - 6), height: 35)
+        label.frame = CGRect(x: 2, y: 54, width: max(0, bounds.width - 4), height: 36)
     }
 
     func setLabelColor(_ color: NSColor) {
@@ -154,7 +161,8 @@ final class ItemView: NSView, NSDraggingSource {
             layer?.borderWidth = 0
         } else if isHovering {
             layer?.backgroundColor = resolvedCGColor(PanelAppearance.itemHover)
-            layer?.borderWidth = 0
+            layer?.borderWidth = 0.5
+            layer?.borderColor = resolvedCGColor(PanelAppearance.itemHoverBorder)
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
             layer?.borderWidth = 0

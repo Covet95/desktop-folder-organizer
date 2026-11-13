@@ -6,7 +6,7 @@ final class AddTileView: NSView {
     var isCompactBanner = false {
         didSet {
             guard isCompactBanner != oldValue else { return }
-            layer?.cornerRadius = isCompactBanner ? 10 : 12
+            layer?.cornerRadius = isCompactBanner ? 11 : 12
             needsDisplay = true
         }
     }
@@ -54,16 +54,18 @@ final class AddTileView: NSView {
 
         let iconSize = min(PanelAppearance.Grid.iconSize, max(1, bounds.width - 8))
         let box = CGRect(x: (bounds.width - iconSize) / 2, y: 7, width: iconSize, height: iconSize)
-        let path = NSBezierPath(roundedRect: box, xRadius: 11, yRadius: 11)
+        let path = NSBezierPath(roundedRect: box, xRadius: 12, yRadius: 12)
+        NSColor.quaternaryLabelColor.withAlphaComponent(isHovering ? 0.14 : 0.07).setFill()
+        path.fill()
         path.lineWidth = 1
-        path.setLineDash([3, 3], count: 2, phase: 0)
-        NSColor.separatorColor.withAlphaComponent(isHovering ? 0.85 : 0.55).setStroke()
+        path.setLineDash([4, 3.5], count: 2, phase: 0)
+        (isHovering ? NSColor.controlAccentColor.withAlphaComponent(0.75) : NSColor.separatorColor.withAlphaComponent(0.36)).setStroke()
         path.stroke()
 
-        let accent = isHovering ? NSColor.controlAccentColor : color.withAlphaComponent(0.80)
+        let accent = isHovering ? NSColor.controlAccentColor : color.withAlphaComponent(0.82)
         accent.setStroke()
         let plus = NSBezierPath()
-        plus.lineWidth = 1.5
+        plus.lineWidth = 1.6
         plus.lineCapStyle = .round
         plus.move(to: CGPoint(x: box.midX - 5.5, y: box.midY))
         plus.line(to: CGPoint(x: box.midX + 5.5, y: box.midY))
@@ -78,36 +80,53 @@ final class AddTileView: NSView {
         ]
         let size = text.size(withAttributes: attributes)
         text.draw(
-            at: CGPoint(x: (bounds.width - size.width) / 2, y: 56),
+            at: CGPoint(x: (bounds.width - size.width) / 2, y: 55),
             withAttributes: attributes
         )
     }
 
     private func drawCompactBanner() {
         let insetRect = bounds.insetBy(dx: 0.5, dy: 0.5)
+        let banner = NSBezierPath(roundedRect: insetRect, xRadius: 11, yRadius: 11)
         if isPressed {
             PanelAppearance.itemPressed.setFill()
-            NSBezierPath(roundedRect: insetRect, xRadius: 10, yRadius: 10).fill()
         } else if isHovering {
             PanelAppearance.itemHover.setFill()
-            NSBezierPath(roundedRect: insetRect, xRadius: 10, yRadius: 10).fill()
+        } else {
+            NSColor.quaternaryLabelColor.withAlphaComponent(0.06).setFill()
         }
+        banner.fill()
 
-        let border = NSBezierPath(roundedRect: insetRect, xRadius: 10, yRadius: 10)
-        border.lineWidth = 1
-        border.setLineDash([3, 3], count: 2, phase: 0)
-        NSColor.separatorColor.withAlphaComponent(isHovering ? 0.75 : 0.45).setStroke()
-        border.stroke()
+        banner.lineWidth = 1
+        banner.setLineDash([4, 3.5], count: 2, phase: 0)
+        (isHovering ? NSColor.controlAccentColor.withAlphaComponent(0.72) : NSColor.separatorColor.withAlphaComponent(0.34)).setStroke()
+        banner.stroke()
 
-        let text = "＋  添加或拖入文件" as NSString
-        let tint = isHovering ? NSColor.controlAccentColor : color.withAlphaComponent(0.75)
+        let tint = isHovering ? NSColor.controlAccentColor : color.withAlphaComponent(0.82)
+        let labelText = "添加或拖入文件" as NSString
         let attributes: [NSAttributedString.Key: Any] = [
             .font: PanelAppearance.Typography.button,
             .foregroundColor: tint
         ]
-        let size = text.size(withAttributes: attributes)
-        text.draw(
-            at: CGPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2),
+        let textSize = labelText.size(withAttributes: attributes)
+        let gap: CGFloat = 6
+        let plusSpan: CGFloat = 9
+        let totalWidth = plusSpan + gap + textSize.width
+        let startX = (bounds.width - totalWidth) / 2
+        let midY = bounds.height / 2
+
+        tint.setStroke()
+        let plus = NSBezierPath()
+        plus.lineWidth = 1.5
+        plus.lineCapStyle = .round
+        plus.move(to: CGPoint(x: startX, y: midY))
+        plus.line(to: CGPoint(x: startX + plusSpan, y: midY))
+        plus.move(to: CGPoint(x: startX + plusSpan / 2, y: midY - plusSpan / 2))
+        plus.line(to: CGPoint(x: startX + plusSpan / 2, y: midY + plusSpan / 2))
+        plus.stroke()
+
+        labelText.draw(
+            at: CGPoint(x: startX + plusSpan + gap, y: (bounds.height - textSize.height) / 2),
             withAttributes: attributes
         )
     }

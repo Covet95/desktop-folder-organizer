@@ -12,6 +12,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
     private let scrollView = NSScrollView()
     private let gridView: GridView
     private let toolbarView = PanelToolbarView()
+    private let toolbarDivider = NSView()
     private let quickLook = QuickLookController()
     private lazy var fileActions = PanelFileActionCoordinator(appStore: appStore, panelStore: store)
     private lazy var contextMenuController = PanelContextMenuController(
@@ -117,6 +118,10 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
             appStore?.onShowFileActivity?()
         }
         contentRoot.addSubview(toolbarView)
+
+        toolbarDivider.wantsLayer = true
+        toolbarDivider.layer?.backgroundColor = resolvedCGColor(PanelAppearance.toolbarHairline)
+        contentRoot.addSubview(toolbarDivider)
 
         emptyStateView.onAction = { [weak self] in self?.didTapEmptyButton() }
         contentRoot.addSubview(emptyStateView)
@@ -251,6 +256,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         primaryColor = PanelAppearance.primaryText
         secondaryColor = PanelAppearance.secondaryText
         toolbarView.applyAppearance(primaryColor: primaryColor, secondaryColor: secondaryColor)
+        toolbarDivider.layer?.backgroundColor = resolvedCGColor(PanelAppearance.toolbarHairline)
         emptyStateView.update(
             searching: isSearchActive,
             primaryColor: primaryColor,
@@ -379,9 +385,12 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         let padding: CGFloat = 14
         let topY: CGFloat = 10
         let topHeight: CGFloat = 28
-        let contentY = topY + topHeight + 8
+        let dividerY = topY + topHeight + 5
+        let scale = max(1, window?.backingScaleFactor ?? 2)
+        let hairline = 1.0 / scale
+        let contentY = dividerY + 6
         let contentWidth = max(0, bounds.width - padding * 2)
-        let contentHeight = max(0, bounds.height - contentY - padding)
+        let contentHeight = max(0, bounds.height - contentY - 12)
         let contentRect = CGRect(x: padding, y: contentY, width: contentWidth, height: contentHeight)
 
         contentRoot.frame = bounds
@@ -392,6 +401,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         gridView.needsLayout = true
 
         toolbarView.frame = CGRect(x: padding, y: topY, width: contentWidth, height: topHeight)
+        toolbarDivider.frame = CGRect(x: padding, y: dividerY, width: contentWidth, height: hairline)
         emptyStateView.frame = contentRect
     }
 
@@ -532,17 +542,17 @@ private final class PanelContentView: NSView {
         super.draw(dirtyRect)
         guard isPanelHovering, canResizeFromCorner?() == true else { return }
 
-        PanelAppearance.tertiaryText.withAlphaComponent(0.55).setStroke()
+        PanelAppearance.tertiaryText.withAlphaComponent(0.42).setStroke()
         let path = NSBezierPath()
-        path.lineWidth = 1.2
+        path.lineWidth = 1.1
         path.lineCapStyle = .round
 
-        let maxX = bounds.width - 7
-        let maxY = bounds.height - 7
-        path.move(to: CGPoint(x: maxX - 7, y: maxY))
-        path.line(to: CGPoint(x: maxX, y: maxY - 7))
-        path.move(to: CGPoint(x: maxX - 3.5, y: maxY))
-        path.line(to: CGPoint(x: maxX, y: maxY - 3.5))
+        let maxX = bounds.width - 6.5
+        let maxY = bounds.height - 6.5
+        path.move(to: CGPoint(x: maxX - 5.5, y: maxY))
+        path.line(to: CGPoint(x: maxX, y: maxY - 5.5))
+        path.move(to: CGPoint(x: maxX - 2.6, y: maxY))
+        path.line(to: CGPoint(x: maxX, y: maxY - 2.6))
         path.stroke()
     }
 }
