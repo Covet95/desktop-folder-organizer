@@ -8,6 +8,7 @@ final class SnapshotRunner {
     private let store: PanelStore
     private let panelView: PanelView
     private let panelWindow: NSWindow
+    private let settingsController: SettingsViewController
     private let settingsWindow: NSWindow
     private let urls: [URL]
     private var step = 0
@@ -56,18 +57,22 @@ final class SnapshotRunner {
         panelWindow.isOpaque = false
         panelWindow.backgroundColor = .clear
         panelWindow.level = .floating
+        panelWindow.appearance = NSAppearance(named: .darkAqua)
         panelWindow.contentView = panelView
         panelWindow.setFrameOrigin(NSPoint(x: 120, y: 160))
 
-        let settings = SettingsViewController(store: store, appStore: appStore)
+        settingsController = SettingsViewController(store: store, appStore: appStore)
+        let settingsSize = settingsController.preferredContentSize
         settingsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 270),
+            contentRect: NSRect(origin: .zero, size: settingsSize),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
+        settingsWindow.backgroundColor = .windowBackgroundColor
         settingsWindow.level = .floating
-        settingsWindow.contentView = settings.view
+        settingsWindow.contentViewController = settingsController
+        settingsWindow.setContentSize(settingsSize)
         settingsWindow.setFrameOrigin(NSPoint(x: 560, y: 200))
         expect(panelView.style == .clear, "panel uses native Clear Liquid Glass")
         expect(panelView.tintColor == nil, "panel does not apply a custom glass tint")
@@ -155,10 +160,24 @@ final class SnapshotRunner {
     }
 
     private func testReorder() {
-        guard let first = store.config.items.first else {
+        guard let first = store.config.items.first,
+              let target = store.config.items.first(where: { $0.name == "会议纪要.txt" }),
+              let expectedSavedIndex = store.config.items.firstIndex(where: { $0.id == target.id })
+        else {
             expect(false, "reorder test has items")
             return
         }
+
+        // Find the target tile center inside the window coordinates so intra-group reorder works with grouping on.
+        panelView.layoutSubtreeIfNeeded()
+        guard let targetTile = findSubview(in: panelView, matching: { ($0 as? ItemView)?.item.id == target.id }) else {
+            expect(false, "reorder test locates target item view")
+            return
+        }
+        let targetCenterInWindow = targetTile.convert(
+            NSPoint(x: targetTile.bounds.midX, y: targetTile.bounds.midY),
+            to: nil
+        )
 
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("com.covet.dfw.reorder.\(UUID().uuidString)"))
         pasteboard.clearContents()
@@ -168,12 +187,25 @@ final class SnapshotRunner {
 
         let handled = panelView.performDrop(
             pasteboard: pasteboard,
-            location: NSPoint(x: 202, y: 284)
+            location: targetCenterInWindow
         )
         expect(handled, "internal reorder reports handled")
 
         let newIndex = store.config.items.firstIndex(where: { $0.id == first.id })
-        expect(newIndex == 2, "internal reorder moves item to slot 2 (got \(String(describing: newIndex)))")
+        expect(
+            newIndex == expectedSavedIndex,
+            "internal reorder moves item to target slot \(expectedSavedIndex) (got \(String(describing: newIndex)))"
+        )
+    }
+
+    private func findSubview(in root: NSView, matching predicate: (NSView) -> Bool) -> NSView? {
+        if predicate(root) { return root }
+        for subview in root.subviews {
+            if let match = findSubview(in: subview, matching: predicate) {
+                return match
+            }
+        }
+        return nil
     }
 
     private func expect(_ condition: Bool, _ message: String) {

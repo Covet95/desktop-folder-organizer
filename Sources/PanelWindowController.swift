@@ -12,8 +12,10 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
 
     private var cancellables = Set<AnyCancellable>()
     private var keyMonitor: Any?
+    private var screenObserver: NSObjectProtocol?
     private var lastHidden: Bool?
     private var lastLevel: PanelLevelMode?
+    private var lastAppearanceMode: PanelAppearanceMode?
 
     init(store: PanelStore, appStore: AppStore) {
         self.store = store
@@ -31,6 +33,8 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
         window.hasShadow = true
         window.isMovableByWindowBackground = false
         window.isReleasedWhenClosed = false
+        window.minSize = PanelAppearance.Window.minPanelSize
+        window.maxSize = PanelAppearance.Window.maxPanelSize
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         window.contentView = panelView
         window.setFrame(frame, display: false)
@@ -53,6 +57,13 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
             .store(in: &cancellables)
 
         installKeyMonitor()
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.keepWindowVisible()
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -62,6 +73,9 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
     deinit {
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)
+        }
+        if let screenObserver {
+            NotificationCenter.default.removeObserver(screenObserver)
         }
     }
 
@@ -79,6 +93,11 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
             if !config.isHidden {
                 window.orderFrontRegardless()
             }
+        }
+
+        if lastAppearanceMode != config.effectiveAppearanceMode {
+            lastAppearanceMode = config.effectiveAppearanceMode
+            window.appearance = config.effectiveAppearanceMode.nsAppearance
         }
 
         if lastHidden != config.isHidden {
@@ -106,6 +125,7 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
         let target = PanelFrame(rect: window.frame).clamped(to: visibleFrame).rect
         guard !Self.framesClose(window.frame, target) else { return }
         window.setFrame(target, display: true)
+        store.updateFrame(PanelFrame(rect: target))
     }
 
     private func installKeyMonitor() {

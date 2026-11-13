@@ -25,7 +25,14 @@ final class DesktopWatcher {
     }
 
     private let desktopURL: URL
+    private let desktopRootPath: String
+    private let desktopRootPrefix: String
     private let onStableItems: ([URL], @escaping (Set<String>) -> Void) -> Void
+    private let watcherQueue = DispatchQueue(
+        label: "com.covet.DesktopFolderWidget.desktop-watcher",
+        qos: .utility
+    )
+    private let watcherQueueKey = DispatchSpecificKey<UInt8>()
     private var eventStream: FSEventStreamRef?
     private var stabilityTimer: DispatchSourceTimer?
     private var stabilityTimerGeneration: UInt64 = 0
@@ -70,15 +77,31 @@ final class DesktopWatcher {
         onNewItems: @escaping ([URL], @escaping (Set<String>) -> Void) -> Void
     ) {
         self.desktopURL = desktopURL
+        let rootPath = desktopURL.standardizedFileURL.path
+        self.desktopRootPath = rootPath
+        self.desktopRootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
         self.onStableItems = onNewItems
-        startWatching()
+        self.watcherQueue.setSpecific(key: watcherQueueKey, value: 1)
+        watcherQueue.async { [weak self] in
+            self?.startWatching()
+        }
     }
 
     deinit {
-        stop()
+        stopOnQueue()
     }
 
     func stop() {
+        if DispatchQueue.getSpecific(key: watcherQueueKey) != nil {
+            stopOnQueue()
+        } else {
+            watcherQueue.sync {
+                stopOnQueue()
+            }
+        }
+    }
+
+    private func stopOnQueue() {
         guard !isStopped else { return }
         isStopped = true
 
@@ -109,14 +132,17 @@ final class DesktopWatcher {
     // A user-initiated restore into Desktop is an intentional destination, not a new intake.
     // Keep the restored file acknowledged until its identity or metadata changes.
     func markHandled(_ url: URL) {
-        let path = Self.pathKey(url)
-        guard let fingerprint = fingerprint(for: url) else { return }
-        known[path] = fingerprint
-        fileStability.removeValue(forKey: path)
-        pendingPaths.remove(path)
-        retryAttempts.removeValue(forKey: path)
-        retryAfter.removeValue(forKey: path)
-        updateStabilityTimer()
+        watcherQueue.async { [weak self] in
+            guard let self, !self.isStopped else { return }
+            let path = Self.pathKey(url)
+            guard let fingerprint = self.fingerprint(for: url) else { return }
+            self.known[path] = fingerprint
+            self.fileStability.removeValue(forKey: path)
+            self.pendingPaths.remove(path)
+            self.retryAttempts.removeValue(forKey: path)
+            self.retryAfter.removeValue(forKey: path)
+            self.updateStabilityTimer()
+        }
     }
 
     private func startWatching() {
@@ -173,7 +199,7 @@ final class DesktopWatcher {
             return false
         }
 
-        FSEventStreamSetDispatchQueue(stream, DispatchQueue.main)
+        FSEventStreamSetDispatchQueue(stream, watcherQueue)
         guard FSEventStreamStart(stream) else {
             FSEventStreamInvalidate(stream)
             FSEventStreamRelease(stream)
@@ -186,7 +212,7 @@ final class DesktopWatcher {
 
     private func startMissingDesktopRetry() {
         guard missingDesktopTimer == nil else { return }
-        let timer = DispatchSource.makeTimerSource(queue: .main)
+        let timer = DispatchSource.makeTimerSource(queue: watcherQueue)
         timer.schedule(
             deadline: .now() + Self.missingDesktopRetryInterval,
             repeating: Self.missingDesktopRetryInterval
@@ -206,7 +232,7 @@ final class DesktopWatcher {
 
     private func startFallbackScan() {
         guard fallbackTimer == nil else { return }
-        let timer = DispatchSource.makeTimerSource(queue: .main)
+        let timer = DispatchSource.makeTimerSource(queue: watcherQueue)
         timer.schedule(
             deadline: .now() + Self.fallbackScanInterval,
             repeating: Self.fallbackScanInterval
@@ -247,11 +273,22 @@ final class DesktopWatcher {
             return
         }
 
-        let currentPaths = Set(items.map(Self.pathKey))
+        let now = Date()
+        var currentPaths = Set<String>()
+        currentPaths.reserveCapacity(items.count)
+        var keyedItems: [(url: URL, path: String)] = []
+        keyedItems.reserveCapacity(items.count)
+
+        for item in items {
+            let path = Self.pathKey(item)
+            currentPaths.insert(path)
+            keyedItems.append((item, path))
+        }
+
         removeMissingPaths(from: currentPaths)
 
-        let readyItems = items.compactMap {
-            observe($0, eventObserved: resetQuietPeriod)
+        let readyItems = keyedItems.compactMap {
+            observe($0.url, pathKey: $0.path, eventObserved: resetQuietPeriod, now: now)
         }
         submitStableItems(readyItems)
         updateStabilityTimer()
@@ -282,20 +319,20 @@ final class DesktopWatcher {
             }
 
             let eventURL = URL(fileURLWithPath: eventPath).standardizedFileURL
-            if let itemURL = topLevelItem(for: eventPath) {
+            if let itemURL = topLevelItem(for: eventURL.path) {
                 if eventURL.path == itemURL.standardizedFileURL.path {
                     changedPaths.insert(itemURL.path)
                 } else {
                     nestedChangedPaths.insert(itemURL.path)
                 }
-            } else if eventURL.path == desktopURL.standardizedFileURL.path {
+            } else if eventURL.path == desktopRootPath {
                 requiresFullScan = true
                 break
             }
         }
 
         if rootChanged {
-            DispatchQueue.main.async { [weak self] in
+            watcherQueue.async { [weak self] in
                 self?.restartAfterRootChange()
             }
             return
@@ -305,24 +342,21 @@ final class DesktopWatcher {
             return
         }
 
+        let now = Date()
         for path in nestedChangedPaths {
-            resetStability(for: URL(fileURLWithPath: path))
+            resetStability(for: URL(fileURLWithPath: path), now: now)
         }
-        let readyItems = changedPaths.compactMap {
-            observe(URL(fileURLWithPath: $0), eventObserved: true)
+        let readyItems = changedPaths.compactMap { path -> URL? in
+            let url = URL(fileURLWithPath: path)
+            return observe(url, pathKey: Self.pathKey(url), eventObserved: true, now: now)
         }
         submitStableItems(readyItems)
         updateStabilityTimer()
     }
 
-    private func topLevelItem(for eventPath: String) -> URL? {
-        let rootPath = desktopURL.standardizedFileURL.path
-        let eventURL = URL(fileURLWithPath: eventPath).standardizedFileURL
-        let path = eventURL.path
-        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-
-        guard path.hasPrefix(prefix) else { return nil }
-        let relativePath = path.dropFirst(prefix.count)
+    private func topLevelItem(for standardizedEventPath: String) -> URL? {
+        guard standardizedEventPath.hasPrefix(desktopRootPrefix) else { return nil }
+        let relativePath = standardizedEventPath.dropFirst(desktopRootPrefix.count)
         guard let firstComponent = relativePath.split(
             separator: "/",
             omittingEmptySubsequences: true
@@ -344,10 +378,10 @@ final class DesktopWatcher {
         }
     }
 
-    private func resetStability(for url: URL) {
+    private func resetStability(for url: URL, now: Date = Date()) {
         let path = Self.pathKey(url)
         guard !inFlight.contains(path) else { return }
-        guard let current = fingerprint(for: url) else {
+        guard let current = fingerprint(for: url, now: now) else {
             removeTracking(for: path)
             return
         }
@@ -356,9 +390,13 @@ final class DesktopWatcher {
         pendingPaths.insert(path)
     }
 
-    private func observe(_ url: URL, eventObserved: Bool) -> URL? {
+    private func observe(
+        _ url: URL,
+        pathKey path: String,
+        eventObserved: Bool,
+        now: Date = Date()
+    ) -> URL? {
         guard !isStopped else { return nil }
-        let path = Self.pathKey(url)
 
         guard !inFlight.contains(path) else { return nil }
         guard !Self.isTemporary(url) else {
@@ -366,7 +404,7 @@ final class DesktopWatcher {
             return nil
         }
 
-        guard let current = fingerprint(for: url) else {
+        guard let current = fingerprint(for: url, now: now) else {
             removeTracking(for: path)
             return nil
         }
@@ -387,7 +425,7 @@ final class DesktopWatcher {
                 previous.size = current.size
                 previous.modifiedAt = current.modifiedAt
                 previous.resourceIdentifier = current.resourceIdentifier
-                previous.lastActivityAt = Date()
+                previous.lastActivityAt = now
                 fileStability[path] = previous
             }
         } else {
@@ -396,14 +434,14 @@ final class DesktopWatcher {
         pendingPaths.insert(path)
 
         guard let stability = fileStability[path],
-              Date() >= stability.lastActivityAt.addingTimeInterval(Self.stabilityInterval),
-              retryAfter[path].map({ Date() >= $0 }) ?? true
+              now >= stability.lastActivityAt.addingTimeInterval(Self.stabilityInterval),
+              retryAfter[path].map({ now >= $0 }) ?? true
         else { return nil }
 
         return url
     }
 
-    private func fingerprint(for url: URL) -> FileStability? {
+    private func fingerprint(for url: URL, now: Date = Date()) -> FileStability? {
         guard let values = try? url.resourceValues(
             forKeys: [.fileSizeKey, .contentModificationDateKey, .fileResourceIdentifierKey]
         ) else { return nil }
@@ -412,15 +450,16 @@ final class DesktopWatcher {
             size: Int64(values.fileSize ?? 0),
             modifiedAt: values.contentModificationDate,
             resourceIdentifier: values.fileResourceIdentifier.map { String(describing: $0) },
-            lastActivityAt: Date()
+            lastActivityAt: now
         )
     }
 
     private func checkPendingPaths() {
         guard !isStopped else { return }
+        let now = Date()
         let paths = pendingPaths.subtracting(inFlight)
-        let readyItems = paths.compactMap {
-            observe(URL(fileURLWithPath: $0), eventObserved: false)
+        let readyItems = paths.compactMap { path in
+            observe(URL(fileURLWithPath: path), pathKey: path, eventObserved: false, now: now)
         }
         submitStableItems(readyItems)
         updateStabilityTimer()
@@ -448,7 +487,7 @@ final class DesktopWatcher {
 
         cancelStabilityTimer()
         let generation = stabilityTimerGeneration
-        let timer = DispatchSource.makeTimerSource(queue: .main)
+        let timer = DispatchSource.makeTimerSource(queue: watcherQueue)
         let delay = max(0.01, nextDeadline.timeIntervalSinceNow)
         timer.schedule(deadline: .now() + delay, leeway: .milliseconds(50))
         timer.setEventHandler { [weak self] in
@@ -466,50 +505,51 @@ final class DesktopWatcher {
     }
 
     private func submitStableItems(_ urls: [URL]) {
-        let readyItems = urls.filter {
-            let path = Self.pathKey($0)
-            return pendingPaths.contains(path) && !inFlight.contains(path)
+        var candidatePaths = Set<String>()
+        var readyItems: [URL] = []
+        for url in urls {
+            let path = Self.pathKey(url)
+            guard pendingPaths.contains(path), !inFlight.contains(path) else { continue }
+            if candidatePaths.insert(path).inserted {
+                readyItems.append(url)
+            }
         }
         guard !readyItems.isEmpty else { return }
 
-        let candidatePaths = Set(readyItems.map(Self.pathKey))
         inFlight.formUnion(candidatePaths)
 
-        onStableItems(readyItems) { [weak self] handledPaths in
+        DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            let finish = { [weak self] in
-                guard let self, !self.isStopped else { return }
-                self.inFlight.subtract(candidatePaths)
+            self.onStableItems(readyItems) { [weak self] handledPaths in
+                guard let self else { return }
+                self.watcherQueue.async { [weak self] in
+                    guard let self, !self.isStopped else { return }
+                    self.inFlight.subtract(candidatePaths)
 
-                for path in candidatePaths {
-                    if handledPaths.contains(path) {
-                        if let fingerprint = self.fileStability.removeValue(forKey: path) {
-                            self.known[path] = fingerprint
+                    for path in candidatePaths {
+                        if handledPaths.contains(path) {
+                            if let fingerprint = self.fileStability.removeValue(forKey: path) {
+                                self.known[path] = fingerprint
+                            }
+                            self.pendingPaths.remove(path)
+                            self.retryAttempts.removeValue(forKey: path)
+                            self.retryAfter.removeValue(forKey: path)
+                        } else {
+                            let attempts = (self.retryAttempts[path] ?? 0) + 1
+                            self.retryAttempts[path] = attempts
+                            let exponent = min(attempts - 1, 10)
+                            let delay = min(
+                                Self.retryMaximumInterval,
+                                Self.retryBaseInterval * pow(2, Double(exponent))
+                            )
+                            self.retryAfter[path] = Date().addingTimeInterval(delay)
+                            NSLog(
+                                "DesktopFolderWidget: auto-absorb will retry \(path) in \(Int(delay)) seconds (attempt \(attempts + 1))"
+                            )
                         }
-                        self.pendingPaths.remove(path)
-                        self.retryAttempts.removeValue(forKey: path)
-                        self.retryAfter.removeValue(forKey: path)
-                    } else {
-                        let attempts = (self.retryAttempts[path] ?? 0) + 1
-                        self.retryAttempts[path] = attempts
-                        let exponent = min(attempts - 1, 10)
-                        let delay = min(
-                            Self.retryMaximumInterval,
-                            Self.retryBaseInterval * pow(2, Double(exponent))
-                        )
-                        self.retryAfter[path] = Date().addingTimeInterval(delay)
-                        NSLog(
-                            "DesktopFolderWidget: auto-absorb will retry \(path) in \(Int(delay)) seconds (attempt \(attempts + 1))"
-                        )
                     }
+                    self.updateStabilityTimer()
                 }
-                self.updateStabilityTimer()
-            }
-
-            if Thread.isMainThread {
-                finish()
-            } else {
-                DispatchQueue.main.async(execute: finish)
             }
         }
     }

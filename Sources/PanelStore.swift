@@ -35,18 +35,37 @@ final class PanelStore: ObservableObject, Identifiable {
     /// and the order/identities of items that are still present.
     func synchronizeManagedItems(_ urls: [URL], directory: URL) {
         let root = directory.standardizedFileURL.path
-        let paths = Set(urls.map { $0.standardizedFileURL.path })
-        var items = config.items.filter { item in
-            let url = URL(fileURLWithPath: item.path).standardizedFileURL
-            return url.deletingLastPathComponent().path != root || paths.contains(url.path)
-        }
-        var seen = Set(items.map { URL(fileURLWithPath: $0.path).standardizedFileURL.path })
-        for url in urls.sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }) {
+        var pathSet = Set<String>()
+        pathSet.reserveCapacity(urls.count)
+        var sortedPairs: [(name: String, path: String)] = []
+        sortedPairs.reserveCapacity(urls.count)
+
+        for url in urls {
             let path = url.standardizedFileURL.path
-            if seen.insert(path).inserted {
-                items.append(WidgetItem(path: path))
+            if pathSet.insert(path).inserted {
+                sortedPairs.append((url.lastPathComponent, path))
             }
         }
+        sortedPairs.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+
+        var items: [WidgetItem] = []
+        items.reserveCapacity(max(config.items.count, sortedPairs.count))
+        var seen = Set<String>()
+        seen.reserveCapacity(max(config.items.count, sortedPairs.count))
+
+        for item in config.items {
+            let url = URL(fileURLWithPath: item.path).standardizedFileURL
+            let standardizedPath = url.path
+            if url.deletingLastPathComponent().path != root || pathSet.contains(standardizedPath) {
+                items.append(item)
+                seen.insert(standardizedPath)
+            }
+        }
+
+        for pair in sortedPairs where seen.insert(pair.path).inserted {
+            items.append(WidgetItem(path: pair.path))
+        }
+
         if items != config.items {
             config.items = items
         }

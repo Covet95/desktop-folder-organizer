@@ -48,10 +48,9 @@ final class PanelFileActionCoordinator {
 
             let blocked = result.rejected + result.failed
             if !blocked.isEmpty {
-                self.showAlert(
+                NSAlert.showMessage(
                     title: "\(blocked.count) 个项目无法收纳",
-                    message: blocked.map(\.lastPathComponent).joined(separator: "\n"),
-                    style: .warning
+                    message: blocked.map(\.lastPathComponent).joined(separator: "\n")
                 )
             }
             completion?(result)
@@ -59,10 +58,7 @@ final class PanelFileActionCoordinator {
     }
 
     func canRestore(_ item: WidgetItem) -> Bool {
-        let path = item.url.standardizedFileURL.path
-        return appStore.fileOperations.contains {
-            $0.canRestore && $0.destinationPath == path
-        }
+        appStore.canRestoreItem(at: item.path)
     }
 
     func rename(_ item: WidgetItem, from window: NSWindow?) {
@@ -77,26 +73,24 @@ final class PanelFileActionCoordinator {
         field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
         alert.accessoryView = field
 
-        let complete: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+        alert.present(from: window) { [weak self] response in
             guard response == .alertFirstButtonReturn else { return }
             self?.appStore.renameItem(at: item.url, to: field.stringValue) { result in
                 if case .failure(let error) = result {
-                    self?.showAlert(title: "重命名失败", message: error.localizedDescription, style: .warning)
+                    NSAlert.showMessage(title: "重命名失败", message: error.localizedDescription)
                 }
             }
-        }
-
-        NSApp.activate(ignoringOtherApps: true)
-        if let window {
-            alert.beginSheetModal(for: window, completionHandler: complete)
-        } else {
-            complete(alert.runModal())
         }
     }
 
     func restore(_ item: WidgetItem, from window: NSWindow?) {
         guard canRestore(item) else {
-            showAlert(title: "没有可恢复的操作", message: "该项目没有尚未撤销的移动或重命名记录。", style: .informational)
+            NSAlert.showMessage(
+                title: "没有可恢复的操作",
+                message: "该项目没有尚未撤销的移动或重命名记录。",
+                style: .informational,
+                from: window
+            )
             return
         }
 
@@ -107,36 +101,20 @@ final class PanelFileActionCoordinator {
         alert.addButton(withTitle: "恢复")
         alert.addButton(withTitle: "取消")
 
-        let complete: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+        alert.present(from: window) { [weak self] response in
             guard response == .alertFirstButtonReturn else { return }
             self?.appStore.restoreLatestOperation(for: item.url.path) { result in
                 switch result {
                 case .success(let url):
-                    self?.showAlert(
+                    NSAlert.showMessage(
                         title: "已恢复",
                         message: "文件已恢复到：\n\(url.path)",
                         style: .informational
                     )
                 case .failure(let error):
-                    self?.showAlert(title: "恢复失败", message: error.localizedDescription, style: .warning)
+                    NSAlert.showMessage(title: "恢复失败", message: error.localizedDescription)
                 }
             }
         }
-
-        NSApp.activate(ignoringOtherApps: true)
-        if let window {
-            alert.beginSheetModal(for: window, completionHandler: complete)
-        } else {
-            complete(alert.runModal())
-        }
-    }
-
-    private func showAlert(title: String, message: String, style: NSAlert.Style) {
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.alertStyle = style
-        alert.runModal()
     }
 }

@@ -4,6 +4,8 @@ final class GridView: NSView {
     let store: PanelStore
     weak var panelView: PanelView?
     private(set) var itemViews: [ItemView] = []
+    private var itemViewsByID: [UUID: ItemView] = [:]
+    private var headerViewsByGroup: [FileDisplayGroup: PanelSectionHeaderView] = [:]
     private var addTile: AddTileView?
     private var labelColor: NSColor = PanelAppearance.primaryText
     private var groupedSections: [(header: PanelSectionHeaderView, range: Range<Int>)] = []
@@ -32,48 +34,98 @@ final class GridView: NSView {
     }
 
     func reload(items: [WidgetItem], isSearching: Bool, groupByType: Bool) {
-        subviews.forEach { $0.removeFromSuperview() }
-        itemViews.removeAll()
-        groupedSections.removeAll()
-        addTile = nil
         typeGrouping = groupByType
 
-        if groupByType {
-            // Classify once per refresh, then preserve each group's saved order.
-            var buckets: [FileDisplayGroup: [WidgetItem]] = [:]
-            for item in items {
-                buckets[item.displayGroup, default: []].append(item)
-            }
-            for group in FileDisplayGroup.allCases {
-                guard let matching = buckets[group], !matching.isEmpty else { continue }
-
-                let header = PanelSectionHeaderView(group: group, count: matching.count)
-                addSubview(header)
-
-                let start = itemViews.count
-                for item in matching { addItem(item) }
-                groupedSections.append((header, start..<itemViews.count))
-            }
-        } else {
-            for item in items { addItem(item) }
+        var metadataByID: [UUID: FileMetadata] = [:]
+        metadataByID.reserveCapacity(items.count)
+        for item in items {
+            metadataByID[item.id] = IconProvider.shared.metadata(for: item)
         }
 
+        let orderedItems: [WidgetItem]
+        var activeGroups: Set<FileDisplayGroup> = []
+        groupedSections.removeAll(keepingCapacity: true)
+
+        if groupByType {
+            var buckets: [FileDisplayGroup: [WidgetItem]] = [:]
+            for item in items {
+                let isDir = metadataByID[item.id]?.isDirectory ?? false
+                let group = FileDisplayGroup.forItem(item, isDirectory: isDir)
+                buckets[group, default: []].append(item)
+            }
+
+            var flattened: [WidgetItem] = []
+            flattened.reserveCapacity(items.count)
+            for group in FileDisplayGroup.allCases {
+                guard let matching = buckets[group], !matching.isEmpty else { continue }
+                activeGroups.insert(group)
+
+                let header: PanelSectionHeaderView
+                if let existing = headerViewsByGroup[group] {
+                    existing.configure(group: group, count: matching.count)
+                    header = existing
+                } else {
+                    header = PanelSectionHeaderView(group: group, count: matching.count)
+                    headerViewsByGroup[group] = header
+                    addSubview(header)
+                }
+
+                let start = flattened.count
+                flattened.append(contentsOf: matching)
+                groupedSections.append((header, start..<flattened.count))
+            }
+            orderedItems = flattened
+        } else {
+            orderedItems = items
+        }
+
+        // Remove unused section headers.
+        for (group, header) in headerViewsByGroup where !activeGroups.contains(group) {
+            header.removeFromSuperview()
+            headerViewsByGroup.removeValue(forKey: group)
+        }
+
+        // Diff and reuse existing ItemViews by item UUID.
+        let desiredIDs = Set(orderedItems.map(\.id))
+        for (id, view) in itemViewsByID where !desiredIDs.contains(id) {
+            view.removeFromSuperview()
+            itemViewsByID.removeValue(forKey: id)
+        }
+
+        var nextViews: [ItemView] = []
+        nextViews.reserveCapacity(orderedItems.count)
+        for item in orderedItems {
+            let metadata = metadataByID[item.id] ?? .missing
+            if let existing = itemViewsByID[item.id] {
+                existing.panelView = panelView
+                existing.configure(item: item, metadata: metadata, labelColor: labelColor)
+                nextViews.append(existing)
+            } else {
+                let view = ItemView(item: item, metadata: metadata, store: store, labelColor: labelColor)
+                view.panelView = panelView
+                addSubview(view)
+                itemViewsByID[item.id] = view
+                nextViews.append(view)
+            }
+        }
+        itemViews = nextViews
+
         if !isSearching {
-            let tile = AddTileView()
-            tile.onTap = { [weak self] in self?.onAddRequested?() }
+            let tile = addTile ?? {
+                let newTile = AddTileView()
+                newTile.onTap = { [weak self] in self?.onAddRequested?() }
+                addSubview(newTile)
+                addTile = newTile
+                return newTile
+            }()
+            tile.isCompactBanner = groupByType && !orderedItems.isEmpty
             tile.setColor(labelColor)
-            addSubview(tile)
-            addTile = tile
+        } else if let tile = addTile {
+            tile.removeFromSuperview()
+            addTile = nil
         }
 
         needsLayout = true
-    }
-
-    private func addItem(_ item: WidgetItem) {
-        let view = ItemView(item: item, store: store, labelColor: labelColor)
-        view.panelView = panelView
-        addSubview(view)
-        itemViews.append(view)
     }
 
     override func layout() {
@@ -88,7 +140,7 @@ final class GridView: NSView {
         let cellWidth = max(1, (width - spacingX * CGFloat(columns - 1)) / CGFloat(columns))
         let cellHeight = PanelAppearance.Grid.tileHeight
 
-        var contentHeight: CGFloat
+        let contentHeight: CGFloat
 
         if typeGrouping {
             var y: CGFloat = 0
@@ -113,8 +165,13 @@ final class GridView: NSView {
                 y += PanelAppearance.Grid.sectionGap
             }
             if let addTile {
-                addTile.frame = CGRect(x: 0, y: y, width: cellWidth, height: cellHeight)
-                y += cellHeight + 4
+                if addTile.isCompactBanner {
+                    addTile.frame = CGRect(x: 0, y: y, width: width, height: 34)
+                    y += 34 + 6
+                } else {
+                    addTile.frame = CGRect(x: 0, y: y, width: cellWidth, height: cellHeight)
+                    y += cellHeight + 4
+                }
             }
             contentHeight = max(y, 4)
         } else {
@@ -161,8 +218,6 @@ final class GridView: NSView {
         guard itemCount > 0 else { return 0 }
 
         if typeGrouping {
-            // A category header or gap selects the nearest visible icon.
-            // The resulting index is in displayed (section-sorted) order.
             return itemViews.enumerated().min {
                 let a = $0.element.frame
                 let b = $1.element.frame

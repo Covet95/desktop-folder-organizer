@@ -61,9 +61,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 self?.updateStatusDisplay()
             }
             .store(in: &cancellables)
-        delegate.appStore.$fileOperations
-            .sink { [weak self] operations in
-                self?.updateHistoryCount(operations.filter(\.canRestore).count)
+        let appStore = delegate.appStore
+        appStore.$fileOperations
+            .sink { [weak self, weak appStore] _ in
+                self?.updateHistoryCount(appStore?.recoverableOperationCount ?? 0)
             }
             .store(in: &cancellables)
     }
@@ -138,12 +139,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
                 try service.register()
             }
         } catch {
-            NSApp.activate(ignoringOtherApps: true)
-            let alert = NSAlert()
-            alert.messageText = "无法修改开机自启"
-            alert.informativeText = "\(error.localizedDescription)\n\n请先把「文档整理」移动到「应用程序」文件夹后再试。"
-            alert.alertStyle = .warning
-            alert.runModal()
+            NSAlert.showMessage(
+                title: "无法修改开机自启",
+                message: "\(error.localizedDescription)\n\n请先把「文档整理」移动到「应用程序」文件夹后再试。"
+            )
         }
         launchItem?.state = service.status == .enabled ? .on : .off
     }

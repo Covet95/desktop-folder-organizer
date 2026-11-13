@@ -8,15 +8,15 @@
 - 文件和文件夹图标网格、拖拽排序、搜索、打开、Finder 定位和快速预览
 - 面板按文件类型分区显示（文件夹、图片、文档、表格、演示文稿、视频、音频、压缩包、代码、其他）；可在「面板设置」关闭分区显示。分组仅改变视觉布局，不会更改磁盘路径；分组内支持拖拽调整顺序，关闭分组后仍保留原平铺排序
 - 面板 UI 使用 macOS 原生玻璃和 SF 系统字体：文件名 12 pt、分类标题 13 pt、设置标题 16 pt；较窄的面板会适当减少实际显示列数，优先保证文件名可读。工具栏保留文件数和原生搜索、添加及设置入口
-- 面板尺寸、位置、列数和位置锁定设置
-- 面板使用 macOS 语义色和原生 Popover 悬浮材质，随系统浅色/深色外观切换
+- 面板尺寸、位置、列数和位置锁定设置；未锁定时支持鼠标悬停面板右下角拖拽调整尺寸
+- 面板使用 macOS 语义色和原生 Popover 悬浮材质，支持跟随系统或单独设置浅色/深色外观
 - 菜单栏入口、全局显示/隐藏快捷键和登录启动选项
 - 面板配置持久化
 - 自动收纳状态反馈、文件操作历史、重命名和撤销恢复
 
 ## 界面设计原则
 
-- **原生外观**：使用 macOS 的 NSGlassEffectView Clear 材质与语义文字颜色，不手工模拟蓝玻璃或更改桌面透明度。
+- **原生外观**：桌面层级使用 macOS 的 NSGlassEffectView Clear 材质，悬浮置顶模式使用 Regular 材质增强复杂背景下的文字对比度；配合语义文字颜色，不手工模拟玻璃色块。
 - **系统字体层级**：使用系统 SF 字体。工具栏和分类标题约 13 pt，文件名 12 pt（至多两行，完整名称可在悬停提示中查看），设置标题 16 pt、设置正文 13 pt；操作记录约 12–15 pt。
 - **适配式文件网格**：保留「每行最多图标」用户设置；窄面板自动减少实际显示列数。分类分隔线和辅助数字采用系统语义色。
 - **不改文件行为**：只调整 AppKit 视图及文字排版，自动收纳、文件路径、恢复操作、配置存储与拖拽业务保持不变。
@@ -58,7 +58,7 @@
 - FileOperationService.swift：独立执行串行文件移动、重命名、恢复及操作日志协调
 - PanelStore.swift：单个面板配置、搜索状态和条目操作
 - PanelView.swift：面板视图组合、外观、布局和键鼠交互
-- PanelToolbarView.swift、PanelEmptyStateView.swift：独立的界面组件
+- PanelToolbarView.swift、PanelEmptyStateView.swift、PanelSectionHeaderView.swift：独立的界面组件
 - PanelDropController.swift、PanelContextMenuController.swift：拖放和右键交互
 - PanelFileActionCoordinator.swift：文件选择、收纳、重命名和恢复入口
 - FileOperationJournal.swift：文件操作写前日志、状态持久化和异常恢复

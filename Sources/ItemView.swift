@@ -1,26 +1,32 @@
 import AppKit
 
 final class ItemView: NSView, NSDraggingSource {
-    let item: WidgetItem
+    private(set) var item: WidgetItem
+    private(set) var metadata: FileMetadata
     weak var panelView: PanelView?
 
     private let store: PanelStore
     private var labelColor: NSColor
     private let iconView = NSImageView()
-    private let label: NSTextField
+    private let label = NSTextField(wrappingLabelWithString: "")
     private var trackingArea: NSTrackingArea?
     private var isHovering = false
+    private var isPressed = false
     private var isDropTarget = false
     private var mouseDownPoint: NSPoint?
     private var didStartDrag = false
+    private var loadedIconPath: String?
+    private var loadedIconTimestamp: TimeInterval = -1
+    private var loadedIconExists: Bool?
+    private var thumbnailGeneration: UInt64 = 0
 
     override var isFlipped: Bool { true }
 
-    init(item: WidgetItem, store: PanelStore, labelColor: NSColor) {
+    init(item: WidgetItem, metadata: FileMetadata, store: PanelStore, labelColor: NSColor) {
         self.item = item
+        self.metadata = metadata
         self.store = store
         self.labelColor = labelColor
-        self.label = NSTextField(wrappingLabelWithString: item.name)
 
         super.init(frame: .zero)
 
@@ -28,76 +34,137 @@ final class ItemView: NSView, NSDraggingSource {
         layer?.cornerRadius = 12
         layer?.cornerCurve = .continuous
 
-        iconView.image = IconProvider.shared.icon(for: item)
         iconView.imageScaling = .scaleProportionallyUpOrDown
-        iconView.contentTintColor = item.exists ? nil : PanelAppearance.tertiaryText
-        iconView.toolTip = item.name
         addSubview(iconView)
 
         label.font = PanelAppearance.Typography.fileName
         label.alignment = .center
         label.maximumNumberOfLines = 2
-        label.lineBreakMode = .byWordWrapping
+        label.lineBreakMode = .byCharWrapping
         label.cell?.usesSingleLineMode = false
         label.cell?.wraps = true
         label.cell?.truncatesLastVisibleLine = true
         label.isSelectable = false
-        label.textColor = item.exists ? labelColor : PanelAppearance.tertiaryText
-        label.toolTip = item.name
         addSubview(label)
 
-        toolTip = item.name
-        updateBackground()
+        configure(item: item, metadata: metadata, labelColor: labelColor)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    func configure(item: WidgetItem, metadata: FileMetadata, labelColor: NSColor) {
+        let oldName = self.item.name
+        self.item = item
+        self.metadata = metadata
+        self.labelColor = labelColor
+
+        if label.stringValue.isEmpty || oldName != item.name {
+            label.stringValue = item.name
+        }
+
+        let tip = metadata.exists
+            ? item.name
+            : "\(item.name)（文件已不在原位置，右键可重新定位或移除）"
+        if toolTip != tip {
+            toolTip = tip
+            iconView.toolTip = tip
+            label.toolTip = tip
+        }
+
+        if loadedIconPath != item.path
+            || loadedIconTimestamp != metadata.modificationTimestamp
+            || loadedIconExists != metadata.exists {
+            loadedIconPath = item.path
+            loadedIconTimestamp = metadata.modificationTimestamp
+            loadedIconExists = metadata.exists
+            thumbnailGeneration &+= 1
+
+            iconView.image = IconProvider.shared.icon(for: item, metadata: metadata)
+            refreshThumbnailIfNeeded()
+        }
+
+        applyColors()
+        updateBackground()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        refreshThumbnailIfNeeded()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateBackground()
+    }
+
+    private func refreshThumbnailIfNeeded() {
+        guard metadata.exists, !metadata.isDirectory else { return }
+        let generation = thumbnailGeneration
+        let targetPath = item.path
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        IconProvider.shared.requestThumbnailIfNeeded(
+            for: item,
+            metadata: metadata,
+            scale: scale
+        ) { [weak self] thumbnail in
+            guard let self,
+                  self.thumbnailGeneration == generation,
+                  self.item.path == targetPath else { return }
+            self.iconView.image = thumbnail
+        }
+    }
+
     override func layout() {
         super.layout()
         let iconSize = min(PanelAppearance.Grid.iconSize, max(1, bounds.width - 8))
         iconView.frame = CGRect(
-            x: (bounds.width - iconSize) / 2, y: 6, width: iconSize, height: iconSize
+            x: (bounds.width - iconSize) / 2, y: 7, width: iconSize, height: iconSize
         )
-        label.frame = CGRect(x: 3, y: 57, width: max(0, bounds.width - 6), height: 32)
+        label.frame = CGRect(x: 3, y: 55, width: max(0, bounds.width - 6), height: 35)
     }
 
     func setLabelColor(_ color: NSColor) {
         labelColor = color
-        label.textColor = item.exists ? color : PanelAppearance.tertiaryText
-        iconView.contentTintColor = item.exists ? nil : PanelAppearance.tertiaryText
+        applyColors()
         updateBackground()
     }
 
     func setDropTarget(_ active: Bool) {
+        guard isDropTarget != active else { return }
         isDropTarget = active
         updateBackground()
     }
 
+    private func applyColors() {
+        label.textColor = metadata.exists ? labelColor : PanelAppearance.tertiaryText
+        iconView.contentTintColor = metadata.exists ? nil : PanelAppearance.tertiaryText
+        iconView.alphaValue = metadata.exists ? (isPressed ? 0.82 : 1.0) : 0.65
+    }
+
     private func updateBackground() {
         if isDropTarget {
-            layer?.backgroundColor = PanelAppearance.itemDrop.cgColor
+            layer?.backgroundColor = resolvedCGColor(PanelAppearance.itemDrop)
+            layer?.borderWidth = 1.5
+            layer?.borderColor = resolvedCGColor(PanelAppearance.itemDropBorder)
+        } else if isPressed {
+            layer?.backgroundColor = resolvedCGColor(PanelAppearance.itemPressed)
+            layer?.borderWidth = 0
         } else if isHovering {
-            layer?.backgroundColor = PanelAppearance.itemHover.cgColor
+            layer?.backgroundColor = resolvedCGColor(PanelAppearance.itemHover)
+            layer?.borderWidth = 0
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
+            layer?.borderWidth = 0
         }
+        iconView.alphaValue = metadata.exists ? (isPressed ? 0.82 : 1.0) : 0.65
     }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let area = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(area)
-        trackingArea = area
+        installHoverTrackingArea(&trackingArea)
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -108,6 +175,7 @@ final class ItemView: NSView, NSDraggingSource {
 
     override func mouseExited(with event: NSEvent) {
         isHovering = false
+        isPressed = false
         panelView?.setHoveredItem(nil)
         updateBackground()
     }
@@ -116,6 +184,8 @@ final class ItemView: NSView, NSDraggingSource {
         window?.makeKey()
         mouseDownPoint = convert(event.locationInWindow, from: nil)
         didStartDrag = false
+        isPressed = true
+        updateBackground()
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -124,46 +194,64 @@ final class ItemView: NSView, NSDraggingSource {
         guard hypot(point.x - start.x, point.y - start.y) >= 4 else { return }
 
         didStartDrag = true
+        isPressed = false
+        updateBackground()
+
         let pasteboardItem = NSPasteboardItem()
         pasteboardItem.setString(item.id.uuidString, forType: PanelView.itemPasteboardType)
+        if metadata.exists {
+            pasteboardItem.setString(item.url.absoluteString, forType: .fileURL)
+        }
 
         let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
-        draggingItem.setDraggingFrame(iconView.frame, contents: IconProvider.shared.icon(for: item))
+        draggingItem.setDraggingFrame(iconView.frame, contents: iconView.image ?? IconProvider.shared.icon(for: item, metadata: metadata))
         let session = beginDraggingSession(with: [draggingItem], event: event, source: self)
         session.animatesToStartingPositionsOnCancelOrFail = true
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { mouseDownPoint = nil }
-        guard !didStartDrag else { return }
-        open(item)
+        let point = convert(event.locationInWindow, from: nil)
+        let shouldOpen = !didStartDrag && bounds.contains(point)
+        mouseDownPoint = nil
+        isPressed = false
+        updateBackground()
+        if shouldOpen {
+            open(item)
+        }
     }
 
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
-        .move
+        context == .withinApplication ? .move : .copy
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
+        let freshMetadata = IconProvider.shared.metadata(for: item, forceRefresh: true)
+        if freshMetadata != metadata {
+            metadata = freshMetadata
+            applyColors()
+        }
+        let exists = freshMetadata.exists
+
         let menu = NSMenu()
 
         let open = NSMenuItem(title: "打开", action: #selector(openItem), keyEquivalent: "")
         open.target = self
-        open.isEnabled = item.exists
+        open.isEnabled = exists
         menu.addItem(open)
 
         let reveal = NSMenuItem(title: "在 Finder 中显示", action: #selector(revealItem), keyEquivalent: "")
         reveal.target = self
-        reveal.isEnabled = item.exists
+        reveal.isEnabled = exists
         menu.addItem(reveal)
 
         let preview = NSMenuItem(title: "快速查看", action: #selector(previewItem), keyEquivalent: "")
         preview.target = self
-        preview.isEnabled = item.exists
+        preview.isEnabled = exists
         menu.addItem(preview)
 
         let rename = NSMenuItem(title: "重命名…", action: #selector(renameFile), keyEquivalent: "")
         rename.target = self
-        rename.isEnabled = item.exists
+        rename.isEnabled = exists
         menu.addItem(rename)
 
         let relocate = NSMenuItem(title: "重新定位…", action: #selector(relocateItem), keyEquivalent: "")

@@ -22,6 +22,7 @@ swiftc -swift-version 5 -parse-as-library \
     Sources/QuickLookController.swift \
     Sources/PanelView.swift \
     Sources/PanelToolbarView.swift \
+    Sources/PanelSectionHeaderView.swift \
     Sources/PanelEmptyStateView.swift \
     Sources/PanelFileActionCoordinator.swift \
     Sources/PanelContextMenuController.swift \

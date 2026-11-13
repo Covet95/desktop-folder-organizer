@@ -66,7 +66,11 @@ enum FileDisplayGroup: String, CaseIterable {
     }
 
     static func forItem(_ item: WidgetItem) -> FileDisplayGroup {
-        if item.isDirectory { return .folders }
+        forItem(item, isDirectory: item.isDirectory)
+    }
+
+    static func forItem(_ item: WidgetItem, isDirectory: Bool) -> FileDisplayGroup {
+        if isDirectory { return .folders }
         let ext = item.url.pathExtension.lowercased()
         switch ext {
         case "jpg", "jpeg", "png", "heic", "heif", "gif", "webp", "bmp", "tif", "tiff", "svg", "raw", "dng":
@@ -134,6 +138,22 @@ enum PanelLevelMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum PanelAppearanceMode: String, Codable, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: return "自动"
+        case .light: return "浅色"
+        case .dark: return "深色"
+        }
+    }
+}
+
 struct PanelConfig: Codable, Identifiable, Equatable {
     var id: UUID
     var frame: PanelFrame
@@ -144,6 +164,7 @@ struct PanelConfig: Codable, Identifiable, Equatable {
     var cornerRadius: Double
     var isLocked: Bool?
     var groupByType: Bool?
+    var appearanceMode: PanelAppearanceMode?
 
     init(
         id: UUID = UUID(),
@@ -154,7 +175,8 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         isHidden: Bool = false,
         cornerRadius: Double = 22,
         isLocked: Bool? = nil,
-        groupByType: Bool? = nil
+        groupByType: Bool? = nil,
+        appearanceMode: PanelAppearanceMode? = nil
     ) {
         self.id = id
         self.frame = frame
@@ -165,6 +187,7 @@ struct PanelConfig: Codable, Identifiable, Equatable {
         self.cornerRadius = cornerRadius
         self.isLocked = isLocked
         self.groupByType = groupByType
+        self.appearanceMode = appearanceMode
     }
 
     var positionLocked: Bool {
@@ -173,6 +196,8 @@ struct PanelConfig: Codable, Identifiable, Equatable {
 
     /// Existing panels default to visual grouping without a schema migration.
     var isTypeGroupingEnabled: Bool { groupByType ?? true }
+
+    var effectiveAppearanceMode: PanelAppearanceMode { appearanceMode ?? .system }
 
     static func makeDefault(index: Int) -> PanelConfig {
         var frame = PanelFrame.default

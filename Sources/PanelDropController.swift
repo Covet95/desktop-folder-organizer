@@ -47,7 +47,7 @@ final class PanelDropController {
                let sourceID = UUID(uuidString: sourceString),
                let source = store.config.items.first(where: { $0.id == sourceID }),
                let target = gridView.displayedItem(at: index),
-               source.displayGroup != target.displayGroup {
+               displayGroup(for: source) != displayGroup(for: target) {
                 gridView.setDropTarget(nil)
                 return []
             }
@@ -83,7 +83,7 @@ final class PanelDropController {
             if store.config.isTypeGroupingEnabled {
                 guard let source = store.config.items.first(where: { $0.id == id }),
                       let target = gridView.displayedItem(at: index),
-                      source.displayGroup == target.displayGroup,
+                      displayGroup(for: source) == displayGroup(for: target),
                       let savedIndex = store.config.items.firstIndex(where: { $0.id == target.id })
                 else { return false }
                 store.move(id: id, toIndex: savedIndex)
@@ -104,5 +104,10 @@ final class PanelDropController {
     func clearDropState() {
         gridView.setDropTarget(nil)
         setHighlight(false)
+    }
+
+    private func displayGroup(for item: WidgetItem) -> FileDisplayGroup {
+        let isDir = IconProvider.shared.metadata(for: item).isDirectory
+        return FileDisplayGroup.forItem(item, isDirectory: isDir)
     }
 }

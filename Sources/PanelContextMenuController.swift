@@ -49,12 +49,11 @@ final class PanelContextMenuController: NSObject {
     }
 
     @objc private func openStorage() {
-        let storage = appStore.storageDirectory
         do {
-            try FileManager.default.createDirectory(at: storage, withIntermediateDirectories: true)
+            let storage = try appStore.prepareStorageDirectory()
             NSWorkspace.shared.open(storage)
         } catch {
-            showError("无法打开存储目录", error: error)
+            NSAlert.showMessage(title: "无法打开存储目录", message: error.localizedDescription)
         }
     }
 
@@ -88,14 +87,5 @@ final class PanelContextMenuController: NSObject {
 
     @objc private func quit() {
         NSApp.terminate(nil)
-    }
-
-    private func showError(_ title: String, error: Error) {
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = error.localizedDescription
-        alert.alertStyle = .warning
-        alert.runModal()
     }
 }

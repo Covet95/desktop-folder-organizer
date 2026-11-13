@@ -68,6 +68,17 @@ final class FileOperationJournal {
     private let directory: URL
     private let fileURL: URL
     private let fileManager = FileManager.default
+    private let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+    private let decoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
 
     private(set) var operations: [FileOperationRecord] = []
     private(set) var loadWarning: String?
@@ -196,8 +207,6 @@ final class FileOperationJournal {
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }
         do {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
             operations = try decoder.decode(FileOperationJournalState.self, from: data).operations
         } catch {
             NSLog("DesktopFolderWidget: operation journal load failed: \(error)")
@@ -288,9 +297,6 @@ final class FileOperationJournal {
 
     private func persist() throws {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(FileOperationJournalState(version: 1, operations: operations))
         try data.write(to: fileURL, options: .atomic)
     }

@@ -32,8 +32,14 @@ struct DesktopIntakeBatch {
 final class DesktopIntakeCoordinator {
     private let appStore: AppStore
     private let desktopURL: URL?
+    private let syncQueue = DispatchQueue(
+        label: "com.covet.DesktopFolderWidget.storage-sync",
+        qos: .utility
+    )
     private var watcher: DesktopWatcher?
     private var storageMonitor: DispatchSourceFileSystemObject?
+    private var pendingStorageSyncWork: DispatchWorkItem?
+    private var isStopped = false
 
     init(
         appStore: AppStore,
@@ -45,6 +51,7 @@ final class DesktopIntakeCoordinator {
 
     func start() {
         guard watcher == nil else { return }
+        isStopped = false
         startStorageMonitoring()
         guard let desktopURL else {
             appStore.updateAutoAbsorbStatus(
@@ -80,6 +87,9 @@ final class DesktopIntakeCoordinator {
     }
 
     func stop() {
+        isStopped = true
+        pendingStorageSyncWork?.cancel()
+        pendingStorageSyncWork = nil
         watcher?.stop()
         watcher = nil
         storageMonitor?.cancel()
@@ -144,31 +154,47 @@ final class DesktopIntakeCoordinator {
                 }
                 return
             }
-            // Wait for internal move/rename/restore callbacks so their panel references
-            // are updated before reconciling directory changes.
-            self.appStore.drainFileOperations { [weak self] in
-                self?.refreshStoredItems()
-            }
+            // Coalesce bursty writes and wait for internal move/rename/restore callbacks
+            // before enumerating the managed directory off the main thread.
+            self.scheduleStoredItemsRefresh()
         }
         source.setCancelHandler { close(descriptor) }
         storageMonitor = source
         source.resume()
     }
 
+    private func scheduleStoredItemsRefresh() {
+        pendingStorageSyncWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, !self.isStopped else { return }
+            self.appStore.drainFileOperations { [weak self] in
+                guard let self, !self.isStopped else { return }
+                self.refreshStoredItems()
+            }
+        }
+        pendingStorageSyncWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
     private func refreshStoredItems() {
         let directory = appStore.storageDirectory
-        let urls: [URL]
-        do {
-            urls = try FileManager.default.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: nil,
-                options: [.skipsHiddenFiles]
-            )
-        } catch {
-            NSLog("DesktopFolderWidget: cannot list storage directory: \(error)")
-            return
+        syncQueue.async { [weak self] in
+            let urls: [URL]
+            do {
+                urls = try FileManager.default.contentsOfDirectory(
+                    at: directory,
+                    includingPropertiesForKeys: nil,
+                    options: [.skipsHiddenFiles]
+                )
+            } catch {
+                NSLog("DesktopFolderWidget: cannot list storage directory: \(error)")
+                return
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isStopped else { return }
+                self.appStore.panels.first?.synchronizeManagedItems(urls, directory: directory)
+            }
         }
-        appStore.panels.first?.synchronizeManagedItems(urls, directory: directory)
     }
 
     private func absorbDesktopItems(

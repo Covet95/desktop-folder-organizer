@@ -151,6 +151,25 @@ struct StoreTests {
             failingPersistenceStore.persistenceWarning != nil,
             "AppStore exposes persistence write failures to observers"
         )
+        failingMemoryRepository.shouldFailSave = false
+        failingPersistenceStore.newPanel()
+        failingPersistenceStore.saveNow()
+        expect(
+            failingPersistenceStore.persistenceWarning == nil,
+            "AppStore clears persistence warnings after a successful save"
+        )
+        let pendingStorageDir = root.appendingPathComponent("PreparedStorage", isDirectory: true)
+        let storagePrepStore = AppStore(
+            persistence: InMemoryPanelStateRepository(
+                directory: root.appendingPathComponent("PreparedStorageSupport", isDirectory: true)
+            ),
+            storageDirectory: pendingStorageDir
+        )
+        let preparedURL = try! storagePrepStore.prepareStorageDirectory()
+        expect(
+            preparedURL == pendingStorageDir && fileManager.fileExists(atPath: pendingStorageDir.path),
+            "AppStore prepares a missing storage directory on demand"
+        )
 
         let protectedDirectory = root.appendingPathComponent("ProtectedSupport", isDirectory: true)
         try! fileManager.createDirectory(at: protectedDirectory, withIntermediateDirectories: true)
@@ -185,6 +204,17 @@ struct StoreTests {
         expect(
             encodedLegacyObject["backgroundHex"] == nil,
             "legacy background color is ignored and omitted from new state"
+        )
+        expect(
+            legacy.effectiveAppearanceMode == .system,
+            "legacy config defaults to automatic appearance mode"
+        )
+        legacy.appearanceMode = .dark
+        let darkModeData = try! JSONEncoder().encode(legacy)
+        let darkModeDecoded = try! JSONDecoder().decode(PanelConfig.self, from: darkModeData)
+        expect(
+            darkModeDecoded.effectiveAppearanceMode == .dark,
+            "panel appearance mode round-trips cleanly"
         )
 
         let moveStore = PanelStore(config: .makeDefault(index: 0))
@@ -518,6 +548,10 @@ struct StoreTests {
         let undoOperationID = undoAbsorbResult?.operationIDs.first
         expect(undoDestination != nil && undoOperationID != nil, "automatic absorb creates a reversible journal entry")
         if let undoDestination, let undoOperationID {
+            expect(
+                undoStore.canRestoreItem(at: undoDestination.path),
+                "absorbed item is immediately indexed as restorable"
+            )
             undoStore.panels[0].add(urls: [undoDestination])
             undoStore.panels[1].add(urls: [undoDestination])
             var renameResult: Result<URL, Error>?
@@ -568,6 +602,11 @@ struct StoreTests {
             expect(
                 undoStore.fileOperations.first(where: { $0.id == undoOperationID })?.state == .restored,
                 "undo is recorded as restored in the operation history"
+            )
+            expect(
+                !undoStore.canRestoreItem(at: undoDestination.path)
+                    && !undoStore.canRestoreItem(at: undoSource.path),
+                "restored operation is removed from the fast restorable lookup index"
             )
         }
 

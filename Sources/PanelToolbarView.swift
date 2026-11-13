@@ -1,20 +1,117 @@
 import AppKit
 
-final class PanelToolbarView: NSView, NSSearchFieldDelegate {
+final class ToolbarIconButton: NSButton {
+    private var isHovering = false
+    private var isButtonPressed = false
+    private var trackingArea: NSTrackingArea?
+
+    init(symbol: String, tooltip: String, target: AnyObject, action: Selector) {
+        super.init(frame: .zero)
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)
+        self.image = image?.withSymbolConfiguration(.init(pointSize: 12.5, weight: .medium))
+        self.imagePosition = .imageOnly
+        self.imageScaling = .scaleProportionallyDown
+        self.isBordered = false
+        self.bezelStyle = .inline
+        self.toolTip = tooltip
+        self.target = target
+        self.action = action
+        self.wantsLayer = true
+        self.layer?.cornerRadius = 7
+        self.layer?.cornerCurve = .continuous
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        installHoverTrackingArea(&trackingArea)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovering = true
+        updateFill()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovering = false
+        isButtonPressed = false
+        updateFill()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        isButtonPressed = true
+        updateFill()
+        super.mouseDown(with: event)
+        isButtonPressed = false
+        updateFill()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateFill()
+    }
+
+    private func updateFill() {
+        if isButtonPressed {
+            layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlPressed)
+        } else if isHovering {
+            layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlHover)
+        } else {
+            layer?.backgroundColor = NSColor.clear.cgColor
+        }
+    }
+}
+
+final class PanelToolbarView: NSView, NSTextFieldDelegate {
     var onSearchChanged: ((String) -> Void)?
     var onSearchRequested: (() -> Void)?
     var onAddRequested: (() -> Void)?
     var onSettingsRequested: (() -> Void)?
+    var onStatusRequested: (() -> Void)?
     var onBackgroundMouseDown: ((NSEvent) -> Void)?
 
-    let searchField = NSSearchField()
-    private let searchButton = NSButton()
-    private let addButton = NSButton()
-    private let settingsButton = NSButton()
+    let searchField = NSTextField()
+    private(set) lazy var settingsButton = ToolbarIconButton(
+        symbol: "gearshape",
+        tooltip: "面板设置",
+        target: self,
+        action: #selector(didTapSettings)
+    )
+    private lazy var searchButton = ToolbarIconButton(
+        symbol: "magnifyingglass",
+        tooltip: "搜索文件 (⌘F)",
+        target: self,
+        action: #selector(didTapSearch)
+    )
+    private lazy var addButton = ToolbarIconButton(
+        symbol: "plus",
+        tooltip: "添加文件（移动原文件）",
+        target: self,
+        action: #selector(didTapAdd)
+    )
+
+    private let titleLabel = NSTextField(labelWithString: "文档整理")
+    private let countLabel = NSTextField(labelWithString: "0 项")
+    private let lockIcon = NSImageView()
+    private let statusPill = NSButton()
+    private let searchContainer = NSView()
+    private let searchLeadingIcon = NSImageView()
+    private lazy var searchCloseButton = ToolbarIconButton(
+        symbol: "xmark",
+        tooltip: "关闭搜索 (Esc)",
+        target: self,
+        action: #selector(didTapSearch)
+    )
+
     private var isHovering = false
     private var forceVisible = false
     private var searchVisible = false
     private var itemCount = 0
+    private var isLocked = false
+    private var hasAttentionStatus = false
     private var primaryColor = PanelAppearance.primaryText
     private var secondaryColor = PanelAppearance.secondaryText
 
@@ -23,21 +120,69 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
 
-        configureButton(searchButton, symbol: "magnifyingglass", tooltip: "搜索文件", action: #selector(didTapSearch))
-        configureButton(addButton, symbol: "plus", tooltip: "添加文件（移动原文件）", action: #selector(didTapAdd))
-        configureButton(settingsButton, symbol: "gearshape", tooltip: "面板设置", action: #selector(didTapSettings))
+        titleLabel.font = PanelAppearance.Typography.toolbarTitle
+        titleLabel.textColor = primaryColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        addSubview(titleLabel)
+
+        countLabel.font = PanelAppearance.Typography.toolbarDetail
+        countLabel.textColor = secondaryColor
+        countLabel.setContentHuggingPriority(.required, for: .horizontal)
+        addSubview(countLabel)
+
+        lockIcon.image = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "位置已锁定")?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+        lockIcon.imageScaling = .scaleProportionallyDown
+        lockIcon.contentTintColor = secondaryColor
+        lockIcon.toolTip = "面板位置已锁定"
+        lockIcon.isHidden = true
+        addSubview(lockIcon)
+
+        statusPill.isBordered = false
+        statusPill.bezelStyle = .inline
+        statusPill.imagePosition = .imageOnly
+        statusPill.imageScaling = .scaleProportionallyDown
+        statusPill.target = self
+        statusPill.action = #selector(didTapStatus)
+        statusPill.isHidden = true
+        addSubview(statusPill)
+
+        addSubview(searchButton)
+        addSubview(addButton)
+        addSubview(settingsButton)
+
+        searchContainer.wantsLayer = true
+        searchContainer.layer?.cornerRadius = 9
+        searchContainer.layer?.cornerCurve = .continuous
+        searchContainer.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
+        searchContainer.isHidden = true
+        addSubview(searchContainer)
+
+        searchLeadingIcon.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "搜索")?
+            .withSymbolConfiguration(.init(pointSize: 12, weight: .medium))
+        searchLeadingIcon.imageScaling = .scaleProportionallyDown
+        searchLeadingIcon.contentTintColor = secondaryColor
+        searchContainer.addSubview(searchLeadingIcon)
 
         searchField.delegate = self
-        searchField.placeholderString = "搜索文件"
+        searchField.placeholderString = "搜索文件名…"
         searchField.font = PanelAppearance.Typography.settingsLabel
         searchField.isBordered = false
-        searchField.bezelStyle = .roundedBezel
-        searchField.drawsBackground = true
+        searchField.drawsBackground = false
         searchField.focusRingType = .none
-        searchField.controlSize = .regular
-        searchField.sendsSearchStringImmediately = true
-        searchField.isHidden = true
-        addSubview(searchField)
+        searchField.isEditable = true
+        searchField.isSelectable = true
+        searchField.maximumNumberOfLines = 1
+        searchField.lineBreakMode = .byTruncatingHead
+        if let cell = searchField.cell as? NSTextFieldCell {
+            cell.usesSingleLineMode = true
+            cell.wraps = false
+            cell.isScrollable = true
+        }
+        searchContainer.addSubview(searchField)
+        searchContainer.addSubview(searchCloseButton)
+
         updateTools()
     }
 
@@ -45,26 +190,83 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        searchContainer.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
+    }
+
     func applyAppearance(primaryColor: NSColor, secondaryColor: NSColor) {
         self.primaryColor = primaryColor
         self.secondaryColor = secondaryColor
+        titleLabel.textColor = primaryColor
+        countLabel.textColor = secondaryColor
+        lockIcon.contentTintColor = secondaryColor
+        searchLeadingIcon.contentTintColor = secondaryColor
         searchField.textColor = primaryColor
-        searchField.backgroundColor = PanelAppearance.controlFill
+        searchContainer.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
         updateTools()
     }
 
     func setItemCount(_ count: Int) {
         guard itemCount != count else { return }
         itemCount = count
-        needsDisplay = true
+        countLabel.stringValue = "\(count) 项"
+        needsLayout = true
+    }
+
+    func setLocked(_ locked: Bool) {
+        guard isLocked != locked else { return }
+        isLocked = locked
+        lockIcon.isHidden = searchVisible || !locked
+        needsLayout = true
+    }
+
+    func setAutoAbsorbStatus(_ status: AutoAbsorbStatus, persistenceWarning: String?) {
+        if let persistenceWarning {
+            hasAttentionStatus = true
+            statusPill.image = NSImage(
+                systemSymbolName: "exclamationmark.triangle.fill",
+                accessibilityDescription: "配置警告"
+            )?.withSymbolConfiguration(.init(pointSize: 11.5, weight: .semibold))
+            statusPill.contentTintColor = .systemOrange
+            statusPill.toolTip = persistenceWarning
+            statusPill.isHidden = searchVisible
+        } else {
+            switch status.phase {
+            case .monitoring:
+                hasAttentionStatus = false
+                statusPill.isHidden = true
+            case .processing:
+                hasAttentionStatus = true
+                statusPill.image = NSImage(
+                    systemSymbolName: "arrow.down.circle.fill",
+                    accessibilityDescription: status.phase.title
+                )?.withSymbolConfiguration(.init(pointSize: 11.5, weight: .medium))
+                statusPill.contentTintColor = .controlAccentColor
+                statusPill.toolTip = "\(status.phase.title)：\(status.detail)"
+                statusPill.isHidden = searchVisible
+            case .retrying, .attention:
+                hasAttentionStatus = true
+                statusPill.image = NSImage(
+                    systemSymbolName: "exclamationmark.triangle.fill",
+                    accessibilityDescription: status.phase.title
+                )?.withSymbolConfiguration(.init(pointSize: 11.5, weight: .semibold))
+                statusPill.contentTintColor = .systemOrange
+                statusPill.toolTip = "\(status.phase.title)：\(status.detail)"
+                statusPill.isHidden = searchVisible
+            }
+        }
+        needsLayout = true
     }
 
     func setHovering(_ hovering: Bool) {
+        guard isHovering != hovering else { return }
         isHovering = hovering
         updateTools()
     }
 
     func setForcedVisible(_ visible: Bool) {
+        guard forceVisible != visible else { return }
         forceVisible = visible
         updateTools()
     }
@@ -77,7 +279,12 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
 
     func setSearchVisible(_ visible: Bool, text: String) {
         searchVisible = visible
-        searchField.isHidden = !visible
+        searchContainer.isHidden = !visible
+        titleLabel.isHidden = visible
+        countLabel.isHidden = visible
+        lockIcon.isHidden = visible || !isLocked
+        statusPill.isHidden = visible || !hasAttentionStatus
+
         if visible {
             setSearchText(text)
             needsLayout = true
@@ -93,67 +300,84 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
             needsLayout = true
         }
         updateTools()
-        needsDisplay = true
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard !searchVisible else { return }
-
-        let title = "文档整理" as NSString
-        let titleAttrs: [NSAttributedString.Key: Any] = [
-            .font: PanelAppearance.Typography.toolbarTitle,
-            .foregroundColor: primaryColor
-        ]
-        let titleSize = title.size(withAttributes: titleAttrs)
-        title.draw(at: NSPoint(x: 0, y: 5), withAttributes: titleAttrs)
-
-        let count = "· \(itemCount) 项" as NSString
-        let countAttrs: [NSAttributedString.Key: Any] = [
-            .font: PanelAppearance.Typography.toolbarDetail,
-            .foregroundColor: secondaryColor
-        ]
-        // The controls are on the opposite edge, so this remains readable in a small panel.
-        count.draw(at: NSPoint(x: titleSize.width + 8, y: 7), withAttributes: countAttrs)
     }
 
     override func layout() {
         super.layout()
-        let buttonSize: CGFloat = 28
-        var x = bounds.width - buttonSize
+
+        let height = bounds.height
+        let width = bounds.width
+        let buttonSize: CGFloat = 26
+
+        var rightX = width
         for button in [settingsButton, addButton, searchButton] {
-            button.frame = CGRect(x: x, y: 0, width: buttonSize, height: buttonSize)
-            x -= buttonSize + 3
+            rightX -= buttonSize
+            button.frame = CGRect(x: rightX, y: (height - buttonSize) / 2, width: buttonSize, height: buttonSize)
+            rightX -= 3
         }
-        searchField.frame = CGRect(x: 0, y: 0, width: bounds.width, height: 28)
+
+        if !statusPill.isHidden {
+            rightX -= 22
+            statusPill.frame = CGRect(x: rightX, y: (height - 22) / 2, width: 22, height: 22)
+            rightX -= 4
+        }
+
+        let leadingWidthLimit = max(0, rightX - 6)
+        let titleSize = titleLabel.sizeThatFits(NSSize(width: leadingWidthLimit, height: 20))
+        let countSize = countLabel.sizeThatFits(NSSize(width: 80, height: 18))
+        let lockWidth: CGFloat = (!lockIcon.isHidden) ? 14 : 0
+        let lockGap: CGFloat = (!lockIcon.isHidden) ? 5 : 0
+        let reservedForCount = countSize.width + 8 + lockWidth + lockGap
+        let titleWidth = min(titleSize.width, max(0, leadingWidthLimit - reservedForCount))
+
+        titleLabel.frame = CGRect(x: 2, y: (height - 18) / 2, width: titleWidth, height: 18)
+        let countX = titleLabel.frame.maxX + 6
+        countLabel.frame = CGRect(
+            x: countX,
+            y: (height - 15) / 2 + 0.5,
+            width: min(countSize.width, max(0, leadingWidthLimit - countX)),
+            height: 15
+        )
+        if !lockIcon.isHidden {
+            lockIcon.frame = CGRect(x: countLabel.frame.maxX + 5, y: (height - 12) / 2, width: 12, height: 12)
+        }
+
+        searchContainer.frame = bounds
+        let iconSize: CGFloat = 14
+        searchLeadingIcon.frame = CGRect(
+            x: 9,
+            y: (height - iconSize) / 2,
+            width: iconSize,
+            height: iconSize
+        )
+        let closeSize: CGFloat = 24
+        searchCloseButton.frame = CGRect(
+            x: max(0, width - closeSize - 3),
+            y: (height - closeSize) / 2,
+            width: closeSize,
+            height: closeSize
+        )
+        let fieldHeight = max(17, ceil(searchField.sizeThatFits(NSSize(width: 200, height: 30)).height))
+        let fieldX = searchLeadingIcon.frame.maxX + 6
+        searchField.frame = CGRect(
+            x: fieldX,
+            y: (height - fieldHeight) / 2,
+            width: max(0, searchCloseButton.frame.minX - fieldX - 4),
+            height: fieldHeight
+        )
     }
 
     override func mouseDown(with event: NSEvent) {
         onBackgroundMouseDown?(event)
     }
 
-    private func configureButton(_ button: NSButton, symbol: String, tooltip: String, action: Selector) {
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)
-        button.image = image?.withSymbolConfiguration(.init(pointSize: 13, weight: .medium))
-        button.imagePosition = .imageOnly
-        button.imageScaling = .scaleProportionallyDown
-        button.isBordered = false
-        button.bezelStyle = .inline
-        button.controlSize = .regular
-        button.toolTip = tooltip
-        button.target = self
-        button.action = action
-        addSubview(button)
-    }
-
     private func updateTools() {
-        // Subdued but discoverable at rest; native semantic tint on hover.
         let emphasis = isHovering || forceVisible
         for button in [searchButton, addButton, settingsButton] {
             button.isHidden = searchVisible
             button.contentTintColor = emphasis ? primaryColor : secondaryColor
         }
-        needsDisplay = true
+        searchCloseButton.contentTintColor = secondaryColor
     }
 
     @objc private func didTapSearch() {
@@ -166,6 +390,10 @@ final class PanelToolbarView: NSView, NSSearchFieldDelegate {
 
     @objc private func didTapSettings() {
         onSettingsRequested?()
+    }
+
+    @objc private func didTapStatus() {
+        onStatusRequested?()
     }
 
     func controlTextDidChange(_ notification: Notification) {

@@ -37,7 +37,6 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
     private var primaryColor: NSColor = PanelAppearance.primaryText
     private var secondaryColor: NSColor = PanelAppearance.secondaryText
 
-    override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
 
     init(store: PanelStore, appStore: AppStore) {
@@ -46,8 +45,8 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         self.gridView = GridView(store: store)
         super.init(frame: .zero)
 
-        // Use the system's native Clear Liquid Glass surface.
-        style = .clear
+        // Desktop panels keep native Clear Liquid Glass; floating panels use Regular for contrast over apps.
+        style = store.config.levelMode == .floating ? .regular : .clear
         tintColor = nil
         cornerRadius = CGFloat(store.config.cornerRadius)
         effectIsInteractive = false
@@ -60,6 +59,12 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         contentRoot.layer?.masksToBounds = true
         contentView = contentRoot
 
+        contentRoot.canResizeFromCorner = { [weak self] in
+            self?.store.config.positionLocked == false
+        }
+        contentRoot.onCornerResize = { [weak self] event in
+            self?.beginCornerResize(with: event)
+        }
         contentRoot.onBackgroundMouseDown = { [weak self] in
             self?.beginWindowDrag(with: $0)
         }
@@ -108,6 +113,9 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
             self.fileActions.chooseFiles(from: self.window)
         }
         toolbarView.onSettingsRequested = { [weak self] in self?.requestSettings() }
+        toolbarView.onStatusRequested = { [weak appStore] in
+            appStore?.onShowFileActivity?()
+        }
         contentRoot.addSubview(toolbarView)
 
         emptyStateView.onAction = { [weak self] in self?.didTapEmptyButton() }
@@ -124,7 +132,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
                 DispatchQueue.main.async {
                     guard let self else { return }
                     let previous = self.lastConfig
-                    self.configChanged(config)
+                    self.applyConfigIfNeeded(config, previous: previous)
                     if previous == nil
                         || previous?.items != config.items
                         || previous?.columns != config.columns
@@ -154,6 +162,14 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
                 }
             }
             .store(in: &cancellables)
+
+        Publishers.CombineLatest(appStore.$autoAbsorbStatus, appStore.$persistenceWarning)
+            .sink { [weak self] status, warning in
+                DispatchQueue.main.async {
+                    self?.toolbarView.setAutoAbsorbStatus(status, persistenceWarning: warning)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     required init?(coder: NSCoder) {
@@ -172,6 +188,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
 
     func setHovering(_ hovering: Bool) {
         toolbarView.setHovering(hovering)
+        contentRoot.setPanelHovering(hovering)
     }
 
     var hasHoveredItem: Bool {
@@ -205,30 +222,42 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         store.isSearchVisible = false
     }
 
-    private func configChanged(_ config: PanelConfig) {
-        let previous = lastConfig
+    private func applyConfigIfNeeded(_ config: PanelConfig, previous: PanelConfig?) {
         lastConfig = config
 
+        let visualChanged = previous == nil
+            || previous?.cornerRadius != config.cornerRadius
+            || previous?.levelMode != config.levelMode
+            || previous?.isLocked != config.isLocked
+            || previous?.appearanceMode != config.appearanceMode
+
+        if visualChanged {
+            style = config.levelMode == .floating ? .regular : .clear
+            appearance = config.effectiveAppearanceMode.nsAppearance
+            cornerRadius = CGFloat(config.cornerRadius)
+            contentRoot.layer?.cornerRadius = CGFloat(config.cornerRadius)
+            toolbarView.setLocked(config.positionLocked)
+            contentRoot.needsDisplay = true
+            refreshSemanticColors()
+        }
+
+        if previous?.columns != config.columns {
+            gridView.needsLayout = true
+            needsLayout = true
+        }
+    }
+
+    private func refreshSemanticColors() {
         primaryColor = PanelAppearance.primaryText
         secondaryColor = PanelAppearance.secondaryText
-
-        cornerRadius = CGFloat(config.cornerRadius)
-        contentRoot.layer?.cornerRadius = CGFloat(config.cornerRadius)
         toolbarView.applyAppearance(primaryColor: primaryColor, secondaryColor: secondaryColor)
         emptyStateView.update(
             searching: isSearchActive,
             primaryColor: primaryColor,
             secondaryColor: secondaryColor
         )
-
         gridView.setLabelColor(primaryColor)
-
-        if previous?.columns != config.columns {
-            gridView.needsLayout = true
-        }
-
-        needsDisplay = true
-        needsLayout = true
+        contentRoot.needsDisplay = true
     }
 
     private func scheduleRefresh() {
@@ -267,30 +296,20 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        configChanged(store.config)
+        refreshSemanticColors()
     }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        if let trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let area = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(area)
-        trackingArea = area
+        installHoverTrackingArea(&trackingArea)
     }
 
     override func mouseEntered(with event: NSEvent) {
-        toolbarView.setHovering(true)
+        setHovering(true)
     }
 
     override func mouseExited(with event: NSEvent) {
-        toolbarView.setHovering(false)
+        setHovering(false)
     }
 
     func beginWindowDrag(with event: NSEvent) {
@@ -301,9 +320,51 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         guard bounds.contains(location) else { return }
 
         window?.performDrag(with: event)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            self?.onWindowDragEnded?()
+        onWindowDragEnded?()
+    }
+
+    private func beginCornerResize(with startEvent: NSEvent) {
+        guard let window, !store.config.positionLocked else { return }
+        window.makeKey()
+
+        let startMouse = NSEvent.mouseLocation
+        let startFrame = window.frame
+        let minSize = PanelAppearance.Window.minPanelSize
+        let maxSize = PanelAppearance.Window.maxPanelSize
+        let visibleFrame = (window.screen ?? NSScreen.main)?.visibleFrame
+        let topY = startFrame.maxY
+
+        var finalFrame = startFrame
+        while let nextEvent = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            let currentMouse = NSEvent.mouseLocation
+            let deltaX = currentMouse.x - startMouse.x
+            let deltaY = currentMouse.y - startMouse.y
+
+            var newWidth = min(maxSize.width, max(minSize.width, startFrame.width + deltaX))
+            var newHeight = min(maxSize.height, max(minSize.height, startFrame.height - deltaY))
+
+            if let visibleFrame {
+                newWidth = min(newWidth, visibleFrame.maxX - startFrame.minX)
+                newHeight = min(newHeight, topY - visibleFrame.minY)
+                newWidth = max(minSize.width, newWidth)
+                newHeight = max(minSize.height, newHeight)
+            }
+
+            finalFrame = CGRect(
+                x: startFrame.minX,
+                y: topY - newHeight,
+                width: newWidth,
+                height: newHeight
+            )
+            window.setFrame(finalFrame, display: true)
+
+            if nextEvent.type == .leftMouseUp {
+                break
+            }
         }
+
+        store.updateFrame(PanelFrame(rect: finalFrame))
+        onWindowDragEnded?()
     }
 
     override func cancelOperation(_ sender: Any?) {
@@ -316,20 +377,21 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         super.layout()
 
         let padding: CGFloat = 14
-        let topY: CGFloat = 9
+        let topY: CGFloat = 10
         let topHeight: CGFloat = 28
-        let contentY = topY + topHeight + 10
+        let contentY = topY + topHeight + 8
         let contentWidth = max(0, bounds.width - padding * 2)
         let contentHeight = max(0, bounds.height - contentY - padding)
         let contentRect = CGRect(x: padding, y: contentY, width: contentWidth, height: contentHeight)
 
         contentRoot.frame = bounds
         scrollView.frame = contentRect
-        gridView.frame.size.width = scrollView.contentSize.width
+        if abs(gridView.frame.size.width - scrollView.contentSize.width) > 0.5 {
+            gridView.frame.size.width = scrollView.contentSize.width
+        }
         gridView.needsLayout = true
 
         toolbarView.frame = CGRect(x: padding, y: topY, width: contentWidth, height: topHeight)
-
         emptyStateView.frame = contentRect
     }
 
@@ -379,8 +441,8 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         }
         popover.contentViewController = controller
 
-        let anchor = CGRect(x: bounds.width - 40, y: 8, width: 20, height: 20)
-        popover.show(relativeTo: anchor, of: self, preferredEdge: .maxY)
+        let anchorButton = toolbarView.settingsButton
+        popover.show(relativeTo: anchorButton.bounds, of: anchorButton, preferredEdge: .minY)
         settingsPopover = popover
         toolbarView.setForcedVisible(true)
     }
@@ -405,11 +467,13 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
 
     private func setDropHighlight(_ active: Bool) {
         contentRoot.layer?.borderWidth = active ? 2 : 0
-        contentRoot.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.72).cgColor
+        contentRoot.layer?.borderColor = resolvedCGColor(PanelAppearance.itemDropBorder)
     }
 }
 
 private final class PanelContentView: NSView {
+    var canResizeFromCorner: (() -> Bool)?
+    var onCornerResize: ((NSEvent) -> Void)?
     var onBackgroundMouseDown: ((NSEvent) -> Void)?
     var onMenuRequested: ((NSEvent) -> NSMenu?)?
     var onDraggingEntered: ((NSDraggingInfo) -> NSDragOperation)?
@@ -417,9 +481,26 @@ private final class PanelContentView: NSView {
     var onDraggingExited: ((NSDraggingInfo?) -> Void)?
     var onPerformDragOperation: ((NSDraggingInfo) -> Bool)?
 
+    private var isPanelHovering = false
+
     override var isFlipped: Bool { true }
 
+    func setPanelHovering(_ hovering: Bool) {
+        guard isPanelHovering != hovering else { return }
+        isPanelHovering = hovering
+        needsDisplay = true
+    }
+
+    private var cornerResizeRect: CGRect {
+        CGRect(x: max(0, bounds.width - 18), y: max(0, bounds.height - 18), width: 18, height: 18)
+    }
+
     override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if canResizeFromCorner?() == true, cornerResizeRect.contains(point) {
+            onCornerResize?(event)
+            return
+        }
         onBackgroundMouseDown?(event)
     }
 
@@ -449,17 +530,19 @@ private final class PanelContentView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        PanelAppearance.tertiaryText.withAlphaComponent(0.62).setFill()
-        for row in 0..<3 {
-            for column in 0..<3 {
-                let rect = CGRect(
-                    x: 14 + CGFloat(column) * 3.4,
-                    y: 17 + CGFloat(row) * 3.4,
-                    width: 1.6,
-                    height: 1.6
-                )
-                NSBezierPath(ovalIn: rect).fill()
-            }
-        }
+        guard isPanelHovering, canResizeFromCorner?() == true else { return }
+
+        PanelAppearance.tertiaryText.withAlphaComponent(0.55).setStroke()
+        let path = NSBezierPath()
+        path.lineWidth = 1.2
+        path.lineCapStyle = .round
+
+        let maxX = bounds.width - 7
+        let maxY = bounds.height - 7
+        path.move(to: CGPoint(x: maxX - 7, y: maxY))
+        path.line(to: CGPoint(x: maxX, y: maxY - 7))
+        path.move(to: CGPoint(x: maxX - 3.5, y: maxY))
+        path.line(to: CGPoint(x: maxX, y: maxY - 3.5))
+        path.stroke()
     }
 }

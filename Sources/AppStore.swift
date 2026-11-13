@@ -17,8 +17,15 @@ final class AppStore: ObservableObject {
     private let persistence: PanelStateRepository
     private let fileOperationService: FileOperationService
     private let configuredStorageDirectory: URL?
+    private let saveQueue = DispatchQueue(
+        label: "com.covet.DesktopFolderWidget.panel-save",
+        qos: .utility
+    )
     private var saveWork: DispatchWorkItem?
+    private var saveGeneration: UInt64 = 0
     private var panelSubscriptions: [UUID: AnyCancellable] = [:]
+    private var restorableDestinationPaths: Set<String> = []
+    private(set) var recoverableOperationCount = 0
 
     init(
         persistence: PanelStateRepository = JSONPanelStateRepository(),
@@ -30,6 +37,7 @@ final class AppStore: ObservableObject {
         let service = FileOperationService(directory: persistence.supportDirectory)
         self.fileOperationService = service
         self.fileOperations = service.initialOperations
+        rebuildOperationIndexes(from: service.initialOperations)
         if let warning = service.loadWarning {
             self.autoAbsorbStatus = AutoAbsorbStatus(
                 phase: .attention,
@@ -50,6 +58,7 @@ final class AppStore: ObservableObject {
         panels.forEach(observe)
 
         service.onOperationsChanged = { [weak self] operations in
+            self?.rebuildOperationIndexes(from: operations)
             self?.fileOperations = operations
         }
         service.onRecoveryAttention = { [weak self] message in
@@ -61,14 +70,36 @@ final class AppStore: ObservableObject {
         configuredStorageDirectory ?? FileOperationService.defaultStorageDirectory
     }
 
+    @discardableResult
+    func prepareStorageDirectory() throws -> URL {
+        let directory = storageDirectory
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
     var canDeletePanel: Bool { panels.count > 1 }
 
     var allHidden: Bool {
         !panels.isEmpty && panels.allSatisfy { $0.config.isHidden }
     }
 
-    var recoverableOperationCount: Int {
-        fileOperations.filter(\.canRestore).count
+    func canRestoreItem(at path: String) -> Bool {
+        restorableDestinationPaths.contains(Self.standardizedPath(path))
+    }
+
+    private static func standardizedPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.path
+    }
+
+    private func rebuildOperationIndexes(from operations: [FileOperationRecord]) {
+        var paths = Set<String>()
+        var count = 0
+        for op in operations where op.canRestore {
+            count += 1
+            paths.insert(op.destinationPath)
+        }
+        restorableDestinationPaths = paths
+        recoverableOperationCount = count
     }
 
     func newPanel() {
@@ -140,8 +171,9 @@ final class AppStore: ObservableObject {
         for path: String,
         completion: @escaping (Result<URL, Error>) -> Void
     ) {
+        let standardized = Self.standardizedPath(path)
         guard let record = fileOperations
-            .filter({ $0.canRestore && $0.destinationPath == URL(fileURLWithPath: path).standardizedFileURL.path })
+            .filter({ $0.canRestore && $0.destinationPath == standardized })
             .max(by: { $0.createdAt < $1.createdAt })
         else {
             completion(.failure(FileOperationJournalError.operationNotRestorable))
@@ -179,14 +211,12 @@ final class AppStore: ObservableObject {
     func saveNow() {
         saveWork?.cancel()
         saveWork = nil
-
-        do {
-            try persistence.save(panels.map(\.config))
-            persistenceWarning = nil
-        } catch {
-            persistenceWarning = error.localizedDescription
-            NSLog("DesktopFolderWidget: panel state save failed: \(error)")
+        saveGeneration &+= 1
+        let snapshot = panels.map(\.config)
+        let failureMessage = saveQueue.sync {
+            persistSnapshot(snapshot)
         }
+        persistenceWarning = failureMessage
     }
 
     private func observe(_ panel: PanelStore) {
@@ -197,8 +227,31 @@ final class AppStore: ObservableObject {
 
     private func scheduleSave() {
         saveWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.saveNow() }
+        saveGeneration &+= 1
+        let generation = saveGeneration
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.saveGeneration == generation else { return }
+            let snapshot = self.panels.map(\.config)
+            self.saveQueue.async { [weak self] in
+                guard let self else { return }
+                let failureMessage = self.persistSnapshot(snapshot)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.saveGeneration == generation else { return }
+                    self.persistenceWarning = failureMessage
+                }
+            }
+        }
         saveWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    }
+
+    private func persistSnapshot(_ snapshot: [PanelConfig]) -> String? {
+        do {
+            try persistence.save(snapshot)
+            return nil
+        } catch {
+            NSLog("DesktopFolderWidget: panel state save failed: \(error)")
+            return error.localizedDescription
+        }
     }
 }

@@ -76,13 +76,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openStorageDirectory() {
-        let storage = appStore.storageDirectory
         do {
-            try FileManager.default.createDirectory(at: storage, withIntermediateDirectories: true)
+            let storage = try appStore.prepareStorageDirectory()
+            NSWorkspace.shared.open(storage)
         } catch {
             NSLog("DesktopFolderWidget: failed to create storage: \(error)")
+            NSWorkspace.shared.open(appStore.storageDirectory)
         }
-        NSWorkspace.shared.open(storage)
     }
 
     @objc func showFileActivity() {
