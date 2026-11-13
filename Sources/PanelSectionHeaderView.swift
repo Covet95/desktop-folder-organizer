@@ -1,42 +1,36 @@
 import AppKit
 
 /// A semantic section heading, without a secondary glass or colored panel.
+/// A category-tinted chip heading with quiet inline count and no heavy divider rules.
 final class PanelSectionHeaderView: NSView {
+    private let iconBadge = NSView()
     private let iconView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
-    private let countBadge = NSView()
     private let countLabel = NSTextField(labelWithString: "")
-    private let separator = NSView()
     private var currentGroup: FileDisplayGroup?
+    private var currentTint: NSColor = PanelAppearance.secondaryText
 
     override var isFlipped: Bool { true }
 
     init(group: FileDisplayGroup, count: Int) {
         super.init(frame: .zero)
 
+        iconBadge.wantsLayer = true
+        iconBadge.layer?.cornerRadius = 5.5
+        iconBadge.layer?.cornerCurve = .continuous
+        addSubview(iconBadge)
+
         iconView.imageScaling = .scaleProportionallyDown
-        iconView.contentTintColor = PanelAppearance.secondaryText
-        addSubview(iconView)
+        iconBadge.addSubview(iconView)
 
         titleLabel.font = PanelAppearance.Typography.sectionTitle
-        titleLabel.textColor = PanelAppearance.secondaryText
+        titleLabel.textColor = PanelAppearance.primaryTextSoft
         titleLabel.lineBreakMode = .byTruncatingTail
         addSubview(titleLabel)
 
-        countBadge.wantsLayer = true
-        countBadge.layer?.cornerRadius = 8
-        countBadge.layer?.cornerCurve = .continuous
-        countBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.sectionBadgeFill)
-        addSubview(countBadge)
-
         countLabel.font = PanelAppearance.Typography.sectionCount
-        countLabel.textColor = PanelAppearance.secondaryText
-        countLabel.alignment = .center
-        countBadge.addSubview(countLabel)
-
-        separator.wantsLayer = true
-        separator.layer?.backgroundColor = resolvedCGColor(PanelAppearance.sectionRule)
-        addSubview(separator)
+        countLabel.textColor = PanelAppearance.tertiaryText
+        addSubview(countLabel)
 
         configure(group: group, count: count)
     }
@@ -48,10 +42,13 @@ final class PanelSectionHeaderView: NSView {
     func configure(group: FileDisplayGroup, count: Int) {
         if currentGroup != group {
             currentGroup = group
+            currentTint = PanelAppearance.tint(for: group)
             iconView.image = NSImage(
                 systemSymbolName: Self.symbol(for: group),
                 accessibilityDescription: group.title
-            )?.withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+            )?.withSymbolConfiguration(.init(pointSize: 10.5, weight: .semibold))
+            iconView.contentTintColor = currentTint
+            iconBadge.layer?.backgroundColor = resolvedCGColor(currentTint.withAlphaComponent(0.16))
             titleLabel.stringValue = group.title
         }
         let countText = String(count)
@@ -64,24 +61,23 @@ final class PanelSectionHeaderView: NSView {
     override func layout() {
         super.layout()
         let width = bounds.width
-        let scale = max(1, window?.backingScaleFactor ?? 2)
-        let hairline = 1.0 / scale
-        iconView.frame = CGRect(x: 2, y: 4, width: 14, height: 14)
-        let countTextWidth = ceil(countLabel.sizeThatFits(NSSize(width: 48, height: 14)).width)
-        let badgeWidth = max(20, countTextWidth + 10)
-        countBadge.frame = CGRect(x: max(0, width - badgeWidth - 2), y: 2.5, width: badgeWidth, height: 16)
-        countLabel.frame = CGRect(x: 0, y: 1, width: badgeWidth, height: 14)
-        titleLabel.frame = CGRect(x: 21, y: 3, width: max(0, countBadge.frame.minX - 27), height: 16)
-        separator.frame = CGRect(x: 2, y: 23, width: max(0, width - 4), height: hairline)
+        iconBadge.frame = CGRect(x: 1, y: 2, width: 18, height: 18)
+        iconView.frame = CGRect(x: 3, y: 3, width: 12, height: 12)
+
+        let titleWidth = ceil(titleLabel.sizeThatFits(NSSize(width: max(0, width - 56), height: 16)).width)
+        let countWidth = ceil(countLabel.sizeThatFits(NSSize(width: 40, height: 15)).width)
+        let maxTitleWidth = max(0, width - iconBadge.frame.maxX - 16 - countWidth)
+        let finalTitleWidth = min(titleWidth, maxTitleWidth)
+
+        titleLabel.frame = CGRect(x: iconBadge.frame.maxX + 7, y: 3, width: finalTitleWidth, height: 16)
+        countLabel.frame = CGRect(x: titleLabel.frame.maxX + 6, y: 3.5, width: countWidth, height: 15)
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        iconView.contentTintColor = PanelAppearance.secondaryText
-        titleLabel.textColor = PanelAppearance.secondaryText
-        countLabel.textColor = PanelAppearance.secondaryText
-        countBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.sectionBadgeFill)
-        separator.layer?.backgroundColor = resolvedCGColor(PanelAppearance.sectionRule)
+        iconBadge.layer?.backgroundColor = resolvedCGColor(currentTint.withAlphaComponent(0.16))
+        titleLabel.textColor = PanelAppearance.primaryTextSoft
+        countLabel.textColor = PanelAppearance.tertiaryText
     }
 
     override func viewDidChangeBackingProperties() {

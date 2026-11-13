@@ -13,8 +13,8 @@ final class SettingsViewController: NSViewController {
     private let columnsStepper = NSStepper(frame: .zero)
     private let levelControl = NSSegmentedControl(labels: ["桌面层", "悬浮置顶"], trackingMode: .selectOne, target: nil, action: nil)
     private let appearanceControl = NSSegmentedControl(labels: ["自动", "浅色", "深色"], trackingMode: .selectOne, target: nil, action: nil)
-    private let lockCheckbox = NSButton(checkboxWithTitle: "锁定位置与尺寸（禁止拖动）", target: nil, action: nil)
-    private let groupCheckbox = NSButton(checkboxWithTitle: "按文件类型分区显示", target: nil, action: nil)
+    private let lockSwitch = NSSwitch()
+    private let groupSwitch = NSSwitch()
     private let clearButton = NSButton(title: "清理失效项", target: nil, action: nil)
     private let deleteButton = NSButton(title: "删除面板", target: nil, action: nil)
     private var cancellables = Set<AnyCancellable>()
@@ -53,31 +53,42 @@ final class SettingsViewController: NSViewController {
         ])
 
         // Header
-        let headerStack = NSStackView()
-        headerStack.orientation = .vertical
-        headerStack.alignment = .leading
-        headerStack.spacing = 3
+        let headerRow = NSStackView()
+        headerRow.orientation = .horizontal
+        headerRow.alignment = .centerY
+        headerRow.spacing = 10
+
+        let headerBadge = SettingsHeaderBadge()
+        let headerTextStack = NSStackView()
+        headerTextStack.orientation = .vertical
+        headerTextStack.alignment = .leading
+        headerTextStack.spacing = 2
 
         let titleLabel = makeLabel("面板设置", font: PanelAppearance.Typography.settingsTitle)
         subtitleLabel.font = PanelAppearance.Typography.settingsDetail
         subtitleLabel.textColor = .secondaryLabelColor
-        headerStack.addArrangedSubview(titleLabel)
-        headerStack.addArrangedSubview(subtitleLabel)
-        mainStack.addArrangedSubview(headerStack)
+        headerTextStack.addArrangedSubview(titleLabel)
+        headerTextStack.addArrangedSubview(subtitleLabel)
+        headerRow.addArrangedSubview(headerBadge)
+        headerRow.addArrangedSubview(headerTextStack)
+        mainStack.addArrangedSubview(headerRow)
 
         // Content Layout Section Card
-        mainStack.setCustomSpacing(10, after: headerStack)
-        mainStack.addArrangedSubview(
-            makeLabel("内容布局", font: PanelAppearance.Typography.settingsSection, color: .secondaryLabelColor)
+        mainStack.setCustomSpacing(12, after: headerRow)
+        let layoutSectionLabel = makeLabel(
+            "内容布局",
+            font: PanelAppearance.Typography.settingsSection,
+            color: .secondaryLabelColor
         )
-        let layoutCard = makeSectionCard(spacing: 8)
+        mainStack.addArrangedSubview(layoutSectionLabel)
+        let layoutCard = makeSectionCard(spacing: 10)
 
         let columnsRow = NSStackView()
         columnsRow.orientation = .horizontal
         columnsRow.alignment = .centerY
         columnsRow.spacing = 8
 
-        let columnsLabel = makeLabel("每行最多图标", font: PanelAppearance.Typography.settingsLabel)
+        let columnsLabel = makeIconLabel("每行最多图标", symbol: "square.grid.2x2")
         let columnsSpacer = NSView()
         columnsSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
@@ -104,17 +115,20 @@ final class SettingsViewController: NSViewController {
             font: PanelAppearance.Typography.settingsDetail,
             color: .secondaryLabelColor
         )
+        columnsHint.lineBreakMode = .byWordWrapping
+        columnsHint.maximumNumberOfLines = 2
+        columnsHint.preferredMaxLayoutWidth = 284
         layoutCard.stack.setCustomSpacing(4, after: columnsRow)
         layoutCard.stack.addArrangedSubview(columnsHint)
 
-        groupCheckbox.controlSize = .regular
-        groupCheckbox.font = PanelAppearance.Typography.settingsLabel
-        groupCheckbox.target = self
-        groupCheckbox.action = #selector(groupingChanged(_:))
-        layoutCard.stack.setCustomSpacing(10, after: columnsHint)
-        layoutCard.stack.addArrangedSubview(groupCheckbox)
+        addCardDivider(to: layoutCard.stack)
 
-        mainStack.setCustomSpacing(6, after: mainStack.arrangedSubviews.last!)
+        groupSwitch.controlSize = .small
+        groupSwitch.target = self
+        groupSwitch.action = #selector(groupingChanged(_:))
+        addSwitchRow(title: "按文件类型分区显示", symbol: "rectangle.3.group", toggle: groupSwitch, to: layoutCard.stack)
+
+        mainStack.setCustomSpacing(6, after: layoutSectionLabel)
         mainStack.addArrangedSubview(layoutCard.card)
         layoutCard.card.widthAnchor.constraint(equalTo: mainStack.widthAnchor).isActive = true
 
@@ -132,25 +146,26 @@ final class SettingsViewController: NSViewController {
         sizeControl.font = PanelAppearance.Typography.settingsLabel
         sizeControl.target = self
         sizeControl.action = #selector(sizeChanged(_:))
-        addControlRow(title: "面板尺寸", control: sizeControl, to: appearanceCard.stack)
+        addControlRow(title: "面板尺寸", symbol: "aspectratio", control: sizeControl, to: appearanceCard.stack)
 
         levelControl.controlSize = .regular
         levelControl.font = PanelAppearance.Typography.settingsLabel
         levelControl.target = self
         levelControl.action = #selector(levelChanged(_:))
-        addControlRow(title: "窗口层级", control: levelControl, to: appearanceCard.stack)
+        addControlRow(title: "窗口层级", symbol: "square.stack.3d.up", control: levelControl, to: appearanceCard.stack)
 
         appearanceControl.controlSize = .regular
         appearanceControl.font = PanelAppearance.Typography.settingsLabel
         appearanceControl.target = self
         appearanceControl.action = #selector(appearanceChanged(_:))
-        addControlRow(title: "面板外观", control: appearanceControl, to: appearanceCard.stack)
+        addControlRow(title: "面板外观", symbol: "circle.lefthalf.filled", control: appearanceControl, to: appearanceCard.stack)
 
-        lockCheckbox.controlSize = .regular
-        lockCheckbox.font = PanelAppearance.Typography.settingsLabel
-        lockCheckbox.target = self
-        lockCheckbox.action = #selector(lockChanged(_:))
-        appearanceCard.stack.addArrangedSubview(lockCheckbox)
+        addCardDivider(to: appearanceCard.stack)
+
+        lockSwitch.controlSize = .small
+        lockSwitch.target = self
+        lockSwitch.action = #selector(lockChanged(_:))
+        addSwitchRow(title: "锁定位置与尺寸", symbol: "lock", toggle: lockSwitch, to: appearanceCard.stack)
 
         mainStack.setCustomSpacing(6, after: appearanceSectionLabel)
         mainStack.addArrangedSubview(appearanceCard.card)
@@ -229,16 +244,54 @@ final class SettingsViewController: NSViewController {
         return (card, stack)
     }
 
+    private func makeIconLabel(_ text: String, symbol: String) -> NSView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 7
+        let icon = NSImageView()
+        icon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 12, weight: .medium))
+        icon.contentTintColor = PanelAppearance.accent
+        icon.imageScaling = .scaleProportionallyDown
+        icon.widthAnchor.constraint(equalToConstant: 15).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 15).isActive = true
+        row.addArrangedSubview(icon)
+        row.addArrangedSubview(makeLabel(text, font: PanelAppearance.Typography.settingsLabel))
+        return row
+    }
+
+    private func addCardDivider(to stack: NSStackView) {
+        let divider = SettingsCardDivider()
+        stack.addArrangedSubview(divider)
+        divider.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+
+    private func addSwitchRow(title: String, symbol: String, toggle: NSSwitch, to stack: NSStackView) {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 8
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        row.addArrangedSubview(makeIconLabel(title, symbol: symbol))
+        row.addArrangedSubview(spacer)
+        row.addArrangedSubview(toggle)
+        stack.addArrangedSubview(row)
+        row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+
     private func addControlRow(
         title: String,
+        symbol: String,
         control: NSSegmentedControl,
         to stack: NSStackView
     ) {
         let container = NSStackView()
         container.orientation = .vertical
         container.alignment = .leading
-        container.spacing = 5
-        container.addArrangedSubview(makeLabel(title, font: PanelAppearance.Typography.settingsLabel))
+        container.spacing = 6
+        container.addArrangedSubview(makeIconLabel(title, symbol: symbol))
         container.addArrangedSubview(control)
         control.translatesAutoresizingMaskIntoConstraints = false
         stack.addArrangedSubview(container)
@@ -260,8 +313,8 @@ final class SettingsViewController: NSViewController {
         case .light: appearanceControl.selectedSegment = 1
         case .dark: appearanceControl.selectedSegment = 2
         }
-        lockCheckbox.state = config.positionLocked ? .on : .off
-        groupCheckbox.state = config.isTypeGroupingEnabled ? .on : .off
+        lockSwitch.state = config.positionLocked ? .on : .off
+        groupSwitch.state = config.isTypeGroupingEnabled ? .on : .off
 
         let missingCount = config.items.reduce(0) { count, item in
             let exists = IconProvider.shared.metadata(for: item).exists
@@ -314,11 +367,11 @@ final class SettingsViewController: NSViewController {
         }
     }
 
-    @objc private func lockChanged(_ sender: NSButton) {
+    @objc private func lockChanged(_ sender: NSSwitch) {
         store.config.isLocked = sender.state == .on
     }
 
-    @objc private func groupingChanged(_ sender: NSButton) {
+    @objc private func groupingChanged(_ sender: NSSwitch) {
         store.config.groupByType = sender.state == .on
     }
 
@@ -344,6 +397,73 @@ final class SettingsViewController: NSViewController {
                 self?.onDelete?()
             }
         }
+    }
+}
+
+private final class SettingsHeaderBadge: NSView {
+    private let icon = NSImageView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 9
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 0.5
+        translatesAutoresizingMaskIntoConstraints = false
+
+        icon.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 13.5, weight: .semibold))
+        icon.contentTintColor = PanelAppearance.accent
+        icon.imageScaling = .scaleProportionallyDown
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(icon)
+
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: 32),
+            heightAnchor.constraint(equalToConstant: 32),
+            icon.centerXAnchor.constraint(equalTo: centerXAnchor),
+            icon.centerYAnchor.constraint(equalTo: centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 18),
+            icon.heightAnchor.constraint(equalToConstant: 18)
+        ])
+        applyColors()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyColors()
+    }
+
+    private func applyColors() {
+        layer?.backgroundColor = resolvedCGColor(PanelAppearance.accentSoftFill)
+        layer?.borderColor = resolvedCGColor(PanelAppearance.accentBorder)
+    }
+}
+
+private final class SettingsCardDivider: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        translatesAutoresizingMaskIntoConstraints = false
+        heightAnchor.constraint(equalToConstant: 0.5).isActive = true
+        applyColor()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyColor()
+    }
+
+    private func applyColor() {
+        layer?.backgroundColor = resolvedCGColor(PanelAppearance.cardBorder)
     }
 }
 
@@ -380,8 +500,18 @@ private final class FlippedView: NSView {
 
     override var isFlipped: Bool { true }
 
+    override func draw(_ dirtyRect: NSRect) {
+        let inPopover = window.map { NSStringFromClass(type(of: $0)).contains("Popover") } ?? false
+        if !inPopover {
+            NSColor.windowBackgroundColor.setFill()
+            dirtyRect.fill()
+        }
+        super.draw(dirtyRect)
+    }
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
         onAppearanceChanged?()
     }
 }

@@ -31,15 +31,15 @@ final class ItemView: NSView, NSDraggingSource {
         super.init(frame: .zero)
 
         wantsLayer = true
-        layer?.cornerRadius = 12
+        layer?.cornerRadius = 14
         layer?.cornerCurve = .continuous
 
         iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.wantsLayer = true
         iconView.layer?.masksToBounds = false
         iconView.layer?.shadowColor = NSColor.black.cgColor
-        iconView.layer?.shadowOpacity = 0.16
-        iconView.layer?.shadowRadius = 3.5
+        iconView.layer?.shadowOpacity = 0.18
+        iconView.layer?.shadowRadius = 4
         iconView.layer?.shadowOffset = CGSize(width: 0, height: -1.5)
         addSubview(iconView)
 
@@ -126,11 +126,11 @@ final class ItemView: NSView, NSDraggingSource {
 
     override func layout() {
         super.layout()
-        let iconSize = min(PanelAppearance.Grid.iconSize, max(1, bounds.width - 8))
+        let iconSize = min(PanelAppearance.Grid.iconSize, max(1, bounds.width - 12))
         iconView.frame = CGRect(
-            x: (bounds.width - iconSize) / 2, y: 7, width: iconSize, height: iconSize
+            x: (bounds.width - iconSize) / 2, y: 9, width: iconSize, height: iconSize
         )
-        label.frame = CGRect(x: 2, y: 54, width: max(0, bounds.width - 4), height: 36)
+        label.frame = CGRect(x: 4, y: 53, width: max(0, bounds.width - 8), height: 32)
     }
 
     func setLabelColor(_ color: NSColor) {
@@ -158,14 +158,20 @@ final class ItemView: NSView, NSDraggingSource {
             layer?.borderColor = resolvedCGColor(PanelAppearance.itemDropBorder)
         } else if isPressed {
             layer?.backgroundColor = resolvedCGColor(PanelAppearance.itemPressed)
-            layer?.borderWidth = 0
+            layer?.borderWidth = 0.75
+            layer?.borderColor = resolvedCGColor(PanelAppearance.itemHoverBorder)
         } else if isHovering {
             layer?.backgroundColor = resolvedCGColor(PanelAppearance.itemHover)
-            layer?.borderWidth = 0.5
+            layer?.borderWidth = 0.75
             layer?.borderColor = resolvedCGColor(PanelAppearance.itemHoverBorder)
+        } else if metadata.exists {
+            layer?.backgroundColor = resolvedCGColor(PanelAppearance.itemTileFill)
+            layer?.borderWidth = 0.5
+            layer?.borderColor = resolvedCGColor(PanelAppearance.itemTileBorder)
         } else {
             layer?.backgroundColor = NSColor.clear.cgColor
-            layer?.borderWidth = 0
+            layer?.borderWidth = 0.5
+            layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
         }
         iconView.alphaValue = metadata.exists ? (isPressed ? 0.82 : 1.0) : 0.65
     }

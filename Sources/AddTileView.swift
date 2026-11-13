@@ -6,7 +6,7 @@ final class AddTileView: NSView {
     var isCompactBanner = false {
         didSet {
             guard isCompactBanner != oldValue else { return }
-            layer?.cornerRadius = isCompactBanner ? 11 : 12
+            layer?.cornerRadius = isCompactBanner ? 12 : 14
             needsDisplay = true
         }
     }
@@ -21,7 +21,7 @@ final class AddTileView: NSView {
     init() {
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 12
+        layer?.cornerRadius = 14
         layer?.cornerCurve = .continuous
         toolTip = "添加文件或文件夹（会移动原文件）"
     }
@@ -43,29 +43,37 @@ final class AddTileView: NSView {
             return
         }
 
-        let radius: CGFloat = 12
+        let radius: CGFloat = 14
+        let cardRect = bounds.insetBy(dx: 0.5, dy: 0.5)
+        let cardPath = NSBezierPath(roundedRect: cardRect, xRadius: radius, yRadius: radius)
         if isPressed {
             PanelAppearance.itemPressed.setFill()
-            NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
+            cardPath.fill()
         } else if isHovering {
             PanelAppearance.itemHover.setFill()
-            NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
+            cardPath.fill()
+            PanelAppearance.accentBorder.setStroke()
+            cardPath.lineWidth = 0.75
+            cardPath.stroke()
+        } else {
+            PanelAppearance.controlFill.setFill()
+            cardPath.fill()
         }
 
         let iconSize = min(PanelAppearance.Grid.iconSize, max(1, bounds.width - 8))
-        let box = CGRect(x: (bounds.width - iconSize) / 2, y: 7, width: iconSize, height: iconSize)
+        let box = CGRect(x: (bounds.width - iconSize) / 2, y: 9, width: iconSize, height: iconSize)
         let path = NSBezierPath(roundedRect: box, xRadius: 12, yRadius: 12)
-        NSColor.quaternaryLabelColor.withAlphaComponent(isHovering ? 0.14 : 0.07).setFill()
+        (isHovering ? PanelAppearance.accentSoftFill : PanelAppearance.controlFill).setFill()
         path.fill()
         path.lineWidth = 1
         path.setLineDash([4, 3.5], count: 2, phase: 0)
-        (isHovering ? NSColor.controlAccentColor.withAlphaComponent(0.75) : NSColor.separatorColor.withAlphaComponent(0.36)).setStroke()
+        (isHovering ? PanelAppearance.accent.withAlphaComponent(0.75) : PanelAppearance.accentBorder).setStroke()
         path.stroke()
 
-        let accent = isHovering ? NSColor.controlAccentColor : color.withAlphaComponent(0.82)
-        accent.setStroke()
+        let plusColor = isHovering ? PanelAppearance.accent : PanelAppearance.accent.withAlphaComponent(0.85)
+        plusColor.setStroke()
         let plus = NSBezierPath()
-        plus.lineWidth = 1.6
+        plus.lineWidth = 1.75
         plus.lineCapStyle = .round
         plus.move(to: CGPoint(x: box.midX - 5.5, y: box.midY))
         plus.line(to: CGPoint(x: box.midX + 5.5, y: box.midY))
@@ -76,57 +84,61 @@ final class AddTileView: NSView {
         let text = "添加" as NSString
         let attributes: [NSAttributedString.Key: Any] = [
             .font: PanelAppearance.Typography.fileName,
-            .foregroundColor: color.withAlphaComponent(isHovering ? 1.0 : 0.78)
+            .foregroundColor: isHovering ? PanelAppearance.primaryText : PanelAppearance.secondaryText
         ]
         let size = text.size(withAttributes: attributes)
         text.draw(
-            at: CGPoint(x: (bounds.width - size.width) / 2, y: 55),
+            at: CGPoint(x: (bounds.width - size.width) / 2, y: box.maxY + 6),
             withAttributes: attributes
         )
     }
 
     private func drawCompactBanner() {
-        let insetRect = bounds.insetBy(dx: 0.5, dy: 0.5)
-        let banner = NSBezierPath(roundedRect: insetRect, xRadius: 11, yRadius: 11)
+        let insetRect = bounds.insetBy(dx: 1, dy: 1)
+        let banner = NSBezierPath(roundedRect: insetRect, xRadius: 12, yRadius: 12)
         if isPressed {
             PanelAppearance.itemPressed.setFill()
         } else if isHovering {
             PanelAppearance.itemHover.setFill()
         } else {
-            NSColor.quaternaryLabelColor.withAlphaComponent(0.06).setFill()
+            PanelAppearance.cardFill.setFill()
         }
         banner.fill()
 
-        banner.lineWidth = 1
+        banner.lineWidth = isHovering ? 1.0 : 0.75
         banner.setLineDash([4, 3.5], count: 2, phase: 0)
-        (isHovering ? NSColor.controlAccentColor.withAlphaComponent(0.72) : NSColor.separatorColor.withAlphaComponent(0.34)).setStroke()
+        (isHovering ? PanelAppearance.accent.withAlphaComponent(0.75) : PanelAppearance.accentBorder).setStroke()
         banner.stroke()
 
-        let tint = isHovering ? NSColor.controlAccentColor : color.withAlphaComponent(0.82)
+        let tint = isHovering ? PanelAppearance.primaryText : PanelAppearance.secondaryText
         let labelText = "添加或拖入文件" as NSString
         let attributes: [NSAttributedString.Key: Any] = [
             .font: PanelAppearance.Typography.button,
             .foregroundColor: tint
         ]
         let textSize = labelText.size(withAttributes: attributes)
-        let gap: CGFloat = 6
-        let plusSpan: CGFloat = 9
-        let totalWidth = plusSpan + gap + textSize.width
+        let badgeSize: CGFloat = 18
+        let gap: CGFloat = 7
+        let totalWidth = badgeSize + gap + textSize.width
         let startX = (bounds.width - totalWidth) / 2
         let midY = bounds.height / 2
 
-        tint.setStroke()
+        let badgeRect = CGRect(x: startX, y: midY - badgeSize / 2, width: badgeSize, height: badgeSize)
+        PanelAppearance.accentSoftFill.setFill()
+        NSBezierPath(ovalIn: badgeRect).fill()
+
+        PanelAppearance.accent.setStroke()
         let plus = NSBezierPath()
-        plus.lineWidth = 1.5
+        plus.lineWidth = 1.6
         plus.lineCapStyle = .round
-        plus.move(to: CGPoint(x: startX, y: midY))
-        plus.line(to: CGPoint(x: startX + plusSpan, y: midY))
-        plus.move(to: CGPoint(x: startX + plusSpan / 2, y: midY - plusSpan / 2))
-        plus.line(to: CGPoint(x: startX + plusSpan / 2, y: midY + plusSpan / 2))
+        plus.move(to: CGPoint(x: badgeRect.midX - 4, y: badgeRect.midY))
+        plus.line(to: CGPoint(x: badgeRect.midX + 4, y: badgeRect.midY))
+        plus.move(to: CGPoint(x: badgeRect.midX, y: badgeRect.midY - 4))
+        plus.line(to: CGPoint(x: badgeRect.midX, y: badgeRect.midY + 4))
         plus.stroke()
 
         labelText.draw(
-            at: CGPoint(x: startX + plusSpan + gap, y: (bounds.height - textSize.height) / 2),
+            at: CGPoint(x: badgeRect.maxX + gap, y: (bounds.height - textSize.height) / 2),
             withAttributes: attributes
         )
     }

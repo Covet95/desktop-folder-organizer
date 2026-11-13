@@ -17,7 +17,7 @@ final class ToolbarIconButton: NSButton {
         self.target = target
         self.action = action
         self.wantsLayer = true
-        self.layer?.cornerRadius = 7
+        self.layer?.cornerRadius = 12
         self.layer?.cornerCurve = .continuous
     }
 
@@ -93,12 +93,13 @@ final class PanelToolbarView: NSView, NSTextFieldDelegate {
         action: #selector(didTapAdd)
     )
 
+    private let leadingBadge = NSView()
     private let leadingIcon = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "文档整理")
-    private let countBadge = NSView()
-    private let countLabel = NSTextField(labelWithString: "0 项")
+    private let countLabel = NSTextField(labelWithString: "·  0 项")
     private let lockIcon = NSImageView()
     private let statusPill = NSButton()
+    private let actionCluster = NSView()
     private let searchContainer = NSView()
     private let searchLeadingIcon = NSImageView()
     private lazy var searchCloseButton = ToolbarIconButton(
@@ -122,13 +123,21 @@ final class PanelToolbarView: NSView, NSTextFieldDelegate {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
 
+        leadingBadge.wantsLayer = true
+        leadingBadge.layer?.cornerRadius = 6.5
+        leadingBadge.layer?.cornerCurve = .continuous
+        leadingBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.accentSoftFill)
+        leadingBadge.layer?.borderWidth = 0.5
+        leadingBadge.layer?.borderColor = resolvedCGColor(PanelAppearance.accentBorder)
+        addSubview(leadingBadge)
+
         leadingIcon.image = NSImage(
             systemSymbolName: "folder.fill",
             accessibilityDescription: nil
-        )?.withSymbolConfiguration(.init(pointSize: 12.5, weight: .semibold))
+        )?.withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
         leadingIcon.imageScaling = .scaleProportionallyDown
-        leadingIcon.contentTintColor = secondaryColor
-        addSubview(leadingIcon)
+        leadingIcon.contentTintColor = PanelAppearance.accent
+        leadingBadge.addSubview(leadingIcon)
 
         titleLabel.font = PanelAppearance.Typography.toolbarTitle
         titleLabel.textColor = primaryColor
@@ -136,17 +145,10 @@ final class PanelToolbarView: NSView, NSTextFieldDelegate {
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         addSubview(titleLabel)
 
-        countBadge.wantsLayer = true
-        countBadge.layer?.cornerRadius = 8.5
-        countBadge.layer?.cornerCurve = .continuous
-        countBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.sectionBadgeFill)
-        addSubview(countBadge)
-
         countLabel.font = PanelAppearance.Typography.toolbarDetail
         countLabel.textColor = secondaryColor
-        countLabel.alignment = .center
         countLabel.setContentHuggingPriority(.required, for: .horizontal)
-        countBadge.addSubview(countLabel)
+        addSubview(countLabel)
 
         lockIcon.image = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "位置已锁定")?
             .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
@@ -165,23 +167,30 @@ final class PanelToolbarView: NSView, NSTextFieldDelegate {
         statusPill.isHidden = true
         addSubview(statusPill)
 
-        addSubview(searchButton)
-        addSubview(addButton)
-        addSubview(settingsButton)
+        actionCluster.wantsLayer = true
+        actionCluster.layer?.cornerRadius = 14
+        actionCluster.layer?.cornerCurve = .continuous
+        actionCluster.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
+        actionCluster.layer?.borderWidth = 0.5
+        actionCluster.layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
+        addSubview(actionCluster)
+        actionCluster.addSubview(searchButton)
+        actionCluster.addSubview(addButton)
+        actionCluster.addSubview(settingsButton)
 
         searchContainer.wantsLayer = true
-        searchContainer.layer?.cornerRadius = 9.5
+        searchContainer.layer?.cornerRadius = 15
         searchContainer.layer?.cornerCurve = .continuous
-        searchContainer.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
-        searchContainer.layer?.borderWidth = 0.5
-        searchContainer.layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
+        searchContainer.layer?.backgroundColor = resolvedCGColor(PanelAppearance.cardFill)
+        searchContainer.layer?.borderWidth = 0.75
+        searchContainer.layer?.borderColor = resolvedCGColor(PanelAppearance.accentBorder)
         searchContainer.isHidden = true
         addSubview(searchContainer)
 
         searchLeadingIcon.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "搜索")?
-            .withSymbolConfiguration(.init(pointSize: 12, weight: .medium))
+            .withSymbolConfiguration(.init(pointSize: 12, weight: .semibold))
         searchLeadingIcon.imageScaling = .scaleProportionallyDown
-        searchLeadingIcon.contentTintColor = secondaryColor
+        searchLeadingIcon.contentTintColor = PanelAppearance.accent
         searchContainer.addSubview(searchLeadingIcon)
 
         searchField.delegate = self
@@ -211,30 +220,33 @@ final class PanelToolbarView: NSView, NSTextFieldDelegate {
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        countBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.sectionBadgeFill)
-        searchContainer.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
-        searchContainer.layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
+        applyLayerColors()
     }
 
     func applyAppearance(primaryColor: NSColor, secondaryColor: NSColor) {
         self.primaryColor = primaryColor
         self.secondaryColor = secondaryColor
-        leadingIcon.contentTintColor = secondaryColor
         titleLabel.textColor = primaryColor
         countLabel.textColor = secondaryColor
-        countBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.sectionBadgeFill)
         lockIcon.contentTintColor = secondaryColor
-        searchLeadingIcon.contentTintColor = secondaryColor
         searchField.textColor = primaryColor
-        searchContainer.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
-        searchContainer.layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
+        applyLayerColors()
         updateTools()
+    }
+
+    private func applyLayerColors() {
+        leadingBadge.layer?.backgroundColor = resolvedCGColor(PanelAppearance.accentSoftFill)
+        leadingBadge.layer?.borderColor = resolvedCGColor(PanelAppearance.accentBorder)
+        actionCluster.layer?.backgroundColor = resolvedCGColor(PanelAppearance.controlFill)
+        actionCluster.layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
+        searchContainer.layer?.backgroundColor = resolvedCGColor(PanelAppearance.cardFill)
+        searchContainer.layer?.borderColor = resolvedCGColor(PanelAppearance.accentBorder)
     }
 
     func setItemCount(_ count: Int) {
         guard itemCount != count else { return }
         itemCount = count
-        countLabel.stringValue = "\(count) 项"
+        countLabel.stringValue = "·  \(count) 项"
         needsLayout = true
     }
 
@@ -304,9 +316,10 @@ final class PanelToolbarView: NSView, NSTextFieldDelegate {
     func setSearchVisible(_ visible: Bool, text: String) {
         searchVisible = visible
         searchContainer.isHidden = !visible
-        leadingIcon.isHidden = visible
+        leadingBadge.isHidden = visible
         titleLabel.isHidden = visible
-        countBadge.isHidden = visible
+        countLabel.isHidden = visible
+        actionCluster.isHidden = visible
         lockIcon.isHidden = visible || !isLocked
         statusPill.isHidden = visible || !hasAttentionStatus
 
@@ -332,63 +345,74 @@ final class PanelToolbarView: NSView, NSTextFieldDelegate {
 
         let height = bounds.height
         let width = bounds.width
-        let buttonSize: CGFloat = 26
-
-        var rightX = width
-        for button in [settingsButton, addButton, searchButton] {
-            rightX -= buttonSize
-            button.frame = CGRect(x: rightX, y: (height - buttonSize) / 2, width: buttonSize, height: buttonSize)
-            rightX -= 3
+        let clusterHeight: CGFloat = 28
+        let buttonSize: CGFloat = 24
+        let clusterWidth = buttonSize * 3 + 6
+        let clusterX = max(0, width - clusterWidth)
+        actionCluster.frame = CGRect(
+            x: clusterX,
+            y: (height - clusterHeight) / 2,
+            width: clusterWidth,
+            height: clusterHeight
+        )
+        for (idx, button) in [searchButton, addButton, settingsButton].enumerated() {
+            button.frame = CGRect(
+                x: 3 + CGFloat(idx) * buttonSize,
+                y: (clusterHeight - buttonSize) / 2,
+                width: buttonSize,
+                height: buttonSize
+            )
         }
 
+        var rightX = clusterX - 4
         if !statusPill.isHidden {
             rightX -= 22
             statusPill.frame = CGRect(x: rightX, y: (height - 22) / 2, width: 22, height: 22)
             rightX -= 4
         }
 
-        let leadingWidthLimit = max(0, rightX - 6)
-        let iconSpace: CGFloat = 20
-        leadingIcon.frame = CGRect(x: 1, y: (height - 15) / 2, width: 15, height: 15)
+        let leadingWidthLimit = max(0, rightX - 4)
+        let badgeSize: CGFloat = 22
+        leadingBadge.frame = CGRect(x: 0, y: (height - badgeSize) / 2, width: badgeSize, height: badgeSize)
+        leadingIcon.frame = CGRect(x: 4, y: 4, width: 14, height: 14)
+
+        let titleX = badgeSize + 8
         let titleSize = titleLabel.sizeThatFits(NSSize(width: leadingWidthLimit, height: 20))
-        let countTextWidth = ceil(countLabel.sizeThatFits(NSSize(width: 80, height: 14)).width)
-        let badgeWidth = countTextWidth + 12
+        let countTextWidth = ceil(countLabel.sizeThatFits(NSSize(width: 80, height: 16)).width)
         let lockWidth: CGFloat = (!lockIcon.isHidden) ? 14 : 0
         let lockGap: CGFloat = (!lockIcon.isHidden) ? 5 : 0
-        let reservedForCount = iconSpace + badgeWidth + 8 + lockWidth + lockGap
+        let reservedForCount = titleX + countTextWidth + 6 + lockWidth + lockGap
         let titleWidth = min(titleSize.width, max(0, leadingWidthLimit - reservedForCount))
 
-        titleLabel.frame = CGRect(x: iconSpace, y: (height - 18) / 2, width: titleWidth, height: 18)
-        let badgeX = titleLabel.frame.maxX + 7
-        let clampedBadgeWidth = min(badgeWidth, max(0, leadingWidthLimit - badgeX))
-        countBadge.frame = CGRect(
-            x: badgeX,
-            y: (height - 17) / 2,
-            width: clampedBadgeWidth,
-            height: 17
+        titleLabel.frame = CGRect(x: titleX, y: (height - 18) / 2, width: titleWidth, height: 18)
+        let countX = titleLabel.frame.maxX + 6
+        countLabel.frame = CGRect(
+            x: countX,
+            y: (height - 15) / 2 + 0.5,
+            width: min(countTextWidth, max(0, leadingWidthLimit - countX)),
+            height: 15
         )
-        countLabel.frame = CGRect(x: 0, y: 1.5, width: clampedBadgeWidth, height: 14)
         if !lockIcon.isHidden {
-            lockIcon.frame = CGRect(x: countBadge.frame.maxX + 5, y: (height - 12) / 2, width: 12, height: 12)
+            lockIcon.frame = CGRect(x: countLabel.frame.maxX + 5, y: (height - 12) / 2, width: 12, height: 12)
         }
 
         searchContainer.frame = bounds
         let iconSize: CGFloat = 14
         searchLeadingIcon.frame = CGRect(
-            x: 9,
+            x: 11,
             y: (height - iconSize) / 2,
             width: iconSize,
             height: iconSize
         )
         let closeSize: CGFloat = 24
         searchCloseButton.frame = CGRect(
-            x: max(0, width - closeSize - 3),
+            x: max(0, width - closeSize - 4),
             y: (height - closeSize) / 2,
             width: closeSize,
             height: closeSize
         )
         let fieldHeight = max(17, ceil(searchField.sizeThatFits(NSSize(width: 200, height: 30)).height))
-        let fieldX = searchLeadingIcon.frame.maxX + 6
+        let fieldX = searchLeadingIcon.frame.maxX + 7
         searchField.frame = CGRect(
             x: fieldX,
             y: (height - fieldHeight) / 2,
@@ -403,9 +427,10 @@ final class PanelToolbarView: NSView, NSTextFieldDelegate {
 
     private func updateTools() {
         let emphasis = isHovering || forceVisible
+        let tint = emphasis ? PanelAppearance.toolbarIconEmphasis : PanelAppearance.toolbarIconIdle
         for button in [searchButton, addButton, settingsButton] {
             button.isHidden = searchVisible
-            button.contentTintColor = emphasis ? primaryColor : secondaryColor
+            button.contentTintColor = tint
         }
         searchCloseButton.contentTintColor = secondaryColor
     }

@@ -1,36 +1,129 @@
 import AppKit
 
-/// Native macOS semantic colors and a shared SF typography scale.
-/// Keep the glass material system-controlled; these tokens style only content.
+/// Native macOS semantic colors, adaptive frosted card tokens, category tints, and SF typography.
+/// Keep the outer glass material system-controlled; these tokens style only interior content.
 enum PanelAppearance {
     static var primaryText: NSColor { .labelColor }
+    static var primaryTextSoft: NSColor {
+        dynamicColor(
+            light: NSColor(calibratedWhite: 0.08, alpha: 0.88),
+            dark: NSColor(calibratedWhite: 0.96, alpha: 0.92)
+        )
+    }
     static var secondaryText: NSColor { .secondaryLabelColor }
     static var tertiaryText: NSColor { .tertiaryLabelColor }
+    static var toolbarIconIdle: NSColor {
+        dynamicColor(
+            light: NSColor(calibratedWhite: 0.14, alpha: 0.78),
+            dark: NSColor(calibratedWhite: 0.92, alpha: 0.78)
+        )
+    }
+    static var toolbarIconEmphasis: NSColor {
+        dynamicColor(
+            light: NSColor(calibratedWhite: 0.06, alpha: 0.96),
+            dark: NSColor(calibratedWhite: 1.0, alpha: 0.96)
+        )
+    }
 
-    static var controlFill: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.16) }
-    static var controlHover: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.26) }
-    static var controlPressed: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.38) }
-    static var controlBorder: NSColor { NSColor.separatorColor.withAlphaComponent(0.22) }
+    static var accent: NSColor { .systemBlue }
+    static var accentSoftFill: NSColor { NSColor.systemBlue.withAlphaComponent(0.15) }
+    static var accentBorder: NSColor { NSColor.systemBlue.withAlphaComponent(0.32) }
 
-    static var cardFill: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.11) }
-    static var cardBorder: NSColor { NSColor.separatorColor.withAlphaComponent(0.20) }
+    static var controlFill: NSColor {
+        dynamicColor(
+            light: NSColor.black.withAlphaComponent(0.055),
+            dark: NSColor.white.withAlphaComponent(0.085)
+        )
+    }
+    static var controlHover: NSColor {
+        dynamicColor(
+            light: NSColor.black.withAlphaComponent(0.10),
+            dark: NSColor.white.withAlphaComponent(0.15)
+        )
+    }
+    static var controlPressed: NSColor {
+        dynamicColor(
+            light: NSColor.black.withAlphaComponent(0.15),
+            dark: NSColor.white.withAlphaComponent(0.22)
+        )
+    }
+    static var controlBorder: NSColor {
+        dynamicColor(
+            light: NSColor.black.withAlphaComponent(0.08),
+            dark: NSColor.white.withAlphaComponent(0.12)
+        )
+    }
 
-    static var itemHover: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.19) }
-    static var itemPressed: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.31) }
-    static var itemHoverBorder: NSColor { NSColor.separatorColor.withAlphaComponent(0.22) }
+    static var cardFill: NSColor {
+        dynamicColor(
+            light: NSColor.white.withAlphaComponent(0.62),
+            dark: NSColor.white.withAlphaComponent(0.065)
+        )
+    }
+    static var cardBorder: NSColor {
+        dynamicColor(
+            light: NSColor.black.withAlphaComponent(0.07),
+            dark: NSColor.white.withAlphaComponent(0.10)
+        )
+    }
+
+    static var itemTileFill: NSColor {
+        dynamicColor(
+            light: NSColor.white.withAlphaComponent(0.68),
+            dark: NSColor.white.withAlphaComponent(0.075)
+        )
+    }
+    static var itemTileBorder: NSColor {
+        dynamicColor(
+            light: NSColor.black.withAlphaComponent(0.075),
+            dark: NSColor.white.withAlphaComponent(0.11)
+        )
+    }
+    static var itemHover: NSColor {
+        dynamicColor(
+            light: NSColor.white.withAlphaComponent(0.84),
+            dark: NSColor.white.withAlphaComponent(0.125)
+        )
+    }
+    static var itemPressed: NSColor {
+        dynamicColor(
+            light: NSColor.white.withAlphaComponent(0.95),
+            dark: NSColor.white.withAlphaComponent(0.18)
+        )
+    }
+    static var itemHoverBorder: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.45) }
     static var itemDrop: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.20) }
-    static var itemDropBorder: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.75) }
-    static var sectionRule: NSColor { NSColor.separatorColor.withAlphaComponent(0.16) }
-    static var sectionBadgeFill: NSColor { NSColor.quaternaryLabelColor.withAlphaComponent(0.18) }
-    static var toolbarHairline: NSColor { NSColor.separatorColor.withAlphaComponent(0.15) }
+    static var itemDropBorder: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.82) }
+
+    static func tint(for group: FileDisplayGroup) -> NSColor {
+        switch group {
+        case .folders: return .systemBlue
+        case .images: return .systemPurple
+        case .documents: return .systemIndigo
+        case .spreadsheets: return .systemGreen
+        case .presentations: return .systemOrange
+        case .videos: return .systemPink
+        case .audio: return .systemTeal
+        case .archives: return .systemBrown
+        case .code: return .systemCyan
+        case .other: return .secondaryLabelColor
+        }
+    }
+
+    private static func dynamicColor(light: NSColor, dark: NSColor) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let match = appearance.bestMatch(from: [.darkAqua, .aqua])
+            return match == .darkAqua ? dark : light
+        }
+    }
 
     enum Typography {
         static var toolbarTitle: NSFont { .systemFont(ofSize: 13.5, weight: .semibold) }
-        static var toolbarDetail: NSFont { .monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold) }
+        static var toolbarDetail: NSFont { .monospacedDigitSystemFont(ofSize: 11.5, weight: .medium) }
         static var sectionTitle: NSFont { .systemFont(ofSize: 11.5, weight: .semibold) }
-        static var sectionCount: NSFont { .monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold) }
-        static var fileName: NSFont { .systemFont(ofSize: 11.5, weight: .medium) }
-        static var secondary: NSFont { .systemFont(ofSize: 11.5, weight: .regular) }
+        static var sectionCount: NSFont { .monospacedDigitSystemFont(ofSize: 11, weight: .medium) }
+        static var fileName: NSFont { .systemFont(ofSize: 11, weight: .medium) }
+        static var secondary: NSFont { .systemFont(ofSize: 12, weight: .regular) }
         static var settingsTitle: NSFont { .systemFont(ofSize: 15, weight: .semibold) }
         static var settingsSection: NSFont { .systemFont(ofSize: 11, weight: .semibold) }
         static var settingsLabel: NSFont { .systemFont(ofSize: 12.5, weight: .regular) }
@@ -41,13 +134,13 @@ enum PanelAppearance {
     }
 
     enum Grid {
-        static let iconSize: CGFloat = 44
-        static let tileHeight: CGFloat = 94
+        static let iconSize: CGFloat = 40
+        static let tileHeight: CGFloat = 90
         static let columnSpacing: CGFloat = 8
         static let rowSpacing: CGFloat = 8
         static let minTileWidth: CGFloat = 80
-        static let sectionHeaderHeight: CGFloat = 26
-        static let sectionGap: CGFloat = 12
+        static let sectionHeaderHeight: CGFloat = 22
+        static let sectionGap: CGFloat = 10
     }
 
     enum Window {
