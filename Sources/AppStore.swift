@@ -12,6 +12,7 @@ final class AppStore: ObservableObject {
     typealias AbsorbSourceDisposition = FileOperationService.AbsorbSourceDisposition
 
     var onShowFileActivity: (() -> Void)?
+    var onCheckForUpdates: (() -> Void)?
     var onFileRestored: ((URL) -> Void)?
 
     private let persistence: PanelStateRepository

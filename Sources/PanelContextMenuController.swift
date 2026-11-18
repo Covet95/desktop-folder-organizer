@@ -34,6 +34,7 @@ final class PanelContextMenuController: NSObject {
         menu.addItem(delete)
 
         menu.addItem(.separator())
+        menu.addItem(item("检查更新…", action: #selector(checkForUpdates)))
         menu.addItem(item("退出", action: #selector(quit)))
         return menu
     }
@@ -83,6 +84,10 @@ final class PanelContextMenuController: NSObject {
 
     @objc private func deletePanel() {
         appStore.removePanel(store)
+    }
+
+    @objc private func checkForUpdates() {
+        appStore.onCheckForUpdates?()
     }
 
     @objc private func quit() {

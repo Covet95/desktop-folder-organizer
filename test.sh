@@ -66,3 +66,11 @@ swiftc -swift-version 5 -parse-as-library \
     Tests/CopyPathTests.swift \
     -o build/CopyPathTests
 ./build/CopyPathTests
+
+echo
+echo "=== APP UPDATE SERVICE TESTS ==="
+swiftc -swift-version 5 -parse-as-library \
+    Sources/AppUpdateService.swift \
+    Tests/AppUpdateServiceTests.swift \
+    -o build/AppUpdateServiceTests
+./build/AppUpdateServiceTests

@@ -52,6 +52,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         launchItem = launch
 
         menu.addItem(.separator())
+        menu.addItem(menuItem("检查更新…", symbol: "arrow.triangle.2.circlepath", action: #selector(checkForUpdates), key: ""))
+        menu.addItem(.separator())
         menu.addItem(menuItem("退出", symbol: nil, action: #selector(quit), key: "q"))
         statusItem.menu = menu
 
@@ -281,6 +283,10 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             )
         }
         launchItem?.state = service.status == .enabled ? .on : .off
+    }
+
+    @objc private func checkForUpdates() {
+        delegate?.checkForUpdates()
     }
 
     @objc private func quit() {

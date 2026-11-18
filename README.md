@@ -10,7 +10,7 @@
 - 面板 UI 使用 macOS 原生玻璃和 SF 系统字体：文件名 12 pt、分类标题 13 pt、设置标题 16 pt；较窄的面板会适当减少实际显示列数，优先保证文件名可读。工具栏保留文件数和原生搜索、添加及设置入口
 - 面板尺寸、位置、列数和位置锁定设置；未锁定时支持鼠标悬停面板右下角拖拽调整尺寸
 - 面板使用 macOS 语义色和原生 Popover 悬浮材质，支持跟随系统或单独设置浅色/深色外观
-- 菜单栏入口、全局显示/隐藏快捷键和登录启动选项
+- 菜单栏入口、全局显示/隐藏快捷键、登录启动选项和手动检查 GitHub Releases 更新（支持 SHA-256 校验与一键替换重启）
 - 面板配置持久化
 - 自动收纳状态反馈、文件操作历史、重命名和撤销恢复
 
@@ -63,6 +63,7 @@
 - PanelFileActionCoordinator.swift：文件选择、收纳、重命名和恢复入口
 - FileOperationJournal.swift：文件操作写前日志、状态持久化和异常恢复
 - FileActivityWindowController.swift：操作历史、状态反馈和恢复界面
+- AppUpdateService.swift、AppUpdateController.swift：轻量原生 GitHub Releases 在线检查更新、SHA-256 校验与安装重启流程
 
 视图层不直接执行文件移动；文件操作统一经过 AppStore 和 FileOperationService。面板配置通过 PanelStateRepository 持久化，文件操作日志由 FileOperationService 管理。桌面自动收纳由 DesktopIntakeCoordinator 编排，AppDelegate 不负责文件筛选和移动流程。
 
@@ -90,13 +91,13 @@ CODESIGN_IDENTITY="<钥匙串中可用的 Apple Development 身份>" ./build.sh
 
 ## 测试
 
-- `./test.sh`：运行 AppStore、PanelStateRepository、FileOperationService 和 CopyPathTests 测试；均使用临时目录与独立剪贴板
+- `./test.sh`：运行 AppStore、PanelStateRepository、FileOperationService、CopyPathTests 和 AppUpdateServiceTests 测试；均使用临时目录、模拟网络与独立剪贴板
 - `./snapshot.sh`：会创建 UI 窗口并在 `/tmp` 写入截图
 - `./feature_tests.sh`：包含 Quick Look 窗口和全局快捷键测试，不适合在用户正在工作的桌面上无提示执行
 
 ## 版本与平台
 
-- 当前版本：`0.2.16`（构建号 `29`）
+- 当前版本：`0.2.17`（构建号 `30`）
 - Bundle ID：`com.covet.DesktopFolderWidget`
 - 最低 macOS 版本：以 `Info.plist` 为准
 - 版本号：`CFBundleShortVersionString`

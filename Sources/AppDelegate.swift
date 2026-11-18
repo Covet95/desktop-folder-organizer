@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var globalHotKey: GlobalHotKey?
     private var desktopIntakeCoordinator: DesktopIntakeCoordinator?
     private var fileActivityWindowController: FileActivityWindowController?
+    private var updateController: AppUpdateController?
     private var cancellables = Set<AnyCancellable>()
     private var isWaitingForFileOperationsBeforeTermination = false
 
@@ -18,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildMainMenu()
         statusBar = StatusBarController(delegate: self)
         appStore.onShowFileActivity = { [weak self] in self?.showFileActivity() }
+        appStore.onCheckForUpdates = { [weak self] in self?.checkForUpdates() }
         desktopIntakeCoordinator = DesktopIntakeCoordinator(appStore: appStore)
         desktopIntakeCoordinator?.start()
         appStore.$panels
@@ -94,6 +96,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         fileActivityWindowController?.window?.makeKeyAndOrderFront(nil)
     }
 
+    @objc func checkForUpdates() {
+        if updateController == nil {
+            updateController = AppUpdateController()
+        }
+        updateController?.checkForUpdates()
+    }
+
     private func syncWindows(_ panels: [PanelStore]) {
         let ids = Set(panels.map(\.id))
         let staleIDs = controllers.keys.filter { !ids.contains($0) }
@@ -119,6 +128,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: ""
         )
+        let checkUpdateItem = NSMenuItem(
+            title: "检查更新…",
+            action: #selector(checkForUpdates),
+            keyEquivalent: ""
+        )
+        checkUpdateItem.target = self
+        appMenu.addItem(checkUpdateItem)
         appMenu.addItem(.separator())
         let quitItem = NSMenuItem(
             title: "退出文档整理",
