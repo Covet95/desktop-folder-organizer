@@ -11,7 +11,6 @@ final class AddTileView: NSView {
         }
     }
 
-    private var color: NSColor = PanelAppearance.secondaryText
     private var isHovering = false
     private var isPressed = false
     private var trackingArea: NSTrackingArea?
@@ -30,8 +29,8 @@ final class AddTileView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func setColor(_ color: NSColor) {
-        self.color = color
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
         needsDisplay = true
     }
 

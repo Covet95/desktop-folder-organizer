@@ -122,6 +122,7 @@ final class SnapshotRunner {
             if let content = settingsWindow.contentView {
                 capture(content, "/tmp/dfw_settings.png")
             }
+            testCopyPathOnDroppedTile()
         default:
             print(failures == 0 ? "snapshots written, all checks passed" : "snapshots written, \(failures) checks failed")
             try? FileManager.default.removeItem(at: root)
@@ -196,6 +197,42 @@ final class SnapshotRunner {
             newIndex == expectedSavedIndex,
             "internal reorder moves item to target slot \(expectedSavedIndex) (got \(String(describing: newIndex)))"
         )
+    }
+
+    private func testCopyPathOnDroppedTile() {
+        panelView.layoutSubtreeIfNeeded()
+        expect(!panelView.isToastVisible, "copy feedback toast remains hidden before copying")
+
+        guard let target = store.config.items.first(where: { $0.name == "季度报告.pdf" }),
+              let targetTile = findSubview(in: panelView, matching: { ($0 as? ItemView)?.item.id == target.id }) as? ItemView
+        else {
+            expect(false, "copy path test locates dropped item view")
+            return
+        }
+
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("com.covet.dfw.copypath.snapshot.\(UUID().uuidString)"))
+        let rightClick = NSEvent.mouseEvent(
+            with: .rightMouseDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: panelWindow.windowNumber,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 1,
+            pressure: 1.0
+        )!
+        let menu = targetTile.menu(for: rightClick)
+        let copyItem = menu?.items.first { $0.title == "复制文件地址" }
+        expect(copyItem?.isEnabled == true, "dropped tile context menu enables 复制文件地址")
+
+        let copied = targetTile.copyPath(to: pasteboard)
+        expect(copied, "dropped tile copyPath succeeds")
+        expect(
+            pasteboard.string(forType: .string) == target.url.standardizedFileURL.path,
+            "dropped tile copies exact managed POSIX path"
+        )
+        expect(panelView.isToastVisible, "dropped tile copyPath displays panel toast feedback")
     }
 
     private func findSubview(in root: NSView, matching predicate: (NSView) -> Bool) -> NSView? {

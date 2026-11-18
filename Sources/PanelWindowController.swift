@@ -148,6 +148,15 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
                 return nil
             }
 
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if modifiers == [.command, .option],
+               event.charactersIgnoringModifiers?.lowercased() == "c",
+               !(window.firstResponder is NSTextView),
+               self.panelView.hasHoveredItem {
+                self.panelView.copyHoveredItemPath()
+                return nil
+            }
+
             return event
         }
     }

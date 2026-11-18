@@ -28,6 +28,9 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
     )
     private var hoveredItem: WidgetItem?
     private let emptyStateView = PanelEmptyStateView()
+    private let toastView = PanelToastView()
+    private var toastGeneration: UInt64 = 0
+    private var toastDismissWorkItem: DispatchWorkItem?
 
     private var settingsPopover: NSPopover?
     private var cancellables = Set<AnyCancellable>()
@@ -120,6 +123,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
 
         emptyStateView.onAction = { [weak self] in self?.didTapEmptyButton() }
         contentRoot.addSubview(emptyStateView)
+        contentRoot.addSubview(toastView)
 
         gridView.panelView = self
         gridView.onAddRequested = { [weak self] in
@@ -177,9 +181,14 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
     }
 
     deinit {
+        toastDismissWorkItem?.cancel()
         if let trackingArea {
             removeTrackingArea(trackingArea)
         }
+    }
+
+    var isToastVisible: Bool {
+        !toastView.isHidden
     }
 
     var isSearchActive: Bool {
@@ -205,8 +214,24 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         }
     }
 
+    func copyHoveredItemPath() {
+        if let hoveredItem {
+            copyPath(hoveredItem)
+        }
+    }
+
     func preview(_ item: WidgetItem) {
         quickLook.preview(item)
+    }
+
+    @discardableResult
+    func copyPath(_ item: WidgetItem, to pasteboard: NSPasteboard = .general) -> Bool {
+        guard PanelFileActionCoordinator.copyPath(of: item, to: pasteboard) != nil else {
+            NSSound.beep()
+            return false
+        }
+        showToast("已复制文件地址")
+        return true
     }
 
     func beginSearch() {
@@ -257,6 +282,7 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
             secondaryColor: secondaryColor
         )
         gridView.setLabelColor(primaryColor)
+        toastView.applyAppearance()
         contentRoot.needsDisplay = true
     }
 
@@ -393,6 +419,14 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
 
         toolbarView.frame = CGRect(x: padding, y: topY, width: contentWidth, height: topHeight)
         emptyStateView.frame = contentRect
+
+        let toastSize = toastView.preferredSize(maxWidth: max(120, bounds.width - 32))
+        toastView.frame = CGRect(
+            x: max(16, (bounds.width - toastSize.width) / 2),
+            y: max(16, bounds.height - toastSize.height - 16),
+            width: toastSize.width,
+            height: toastSize.height
+        )
     }
 
     @objc private func didTapEmptyButton() {
@@ -468,6 +502,117 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
     private func setDropHighlight(_ active: Bool) {
         contentRoot.layer?.borderWidth = active ? 2 : 0
         contentRoot.layer?.borderColor = resolvedCGColor(PanelAppearance.itemDropBorder)
+    }
+
+    private func showToast(_ message: String) {
+        toastDismissWorkItem?.cancel()
+        toastGeneration &+= 1
+        let generation = toastGeneration
+
+        toastView.configure(message: message)
+        toastView.isHidden = false
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.14
+            toastView.animator().alphaValue = 1
+        }
+
+        let dismiss = DispatchWorkItem { [weak self] in
+            guard let self, self.toastGeneration == generation else { return }
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.22
+                self.toastView.animator().alphaValue = 0
+            }, completionHandler: { [weak self] in
+                DispatchQueue.main.async {
+                    guard let self, self.toastGeneration == generation else { return }
+                    self.toastView.isHidden = true
+                }
+            })
+        }
+        toastDismissWorkItem = dismiss
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: dismiss)
+    }
+}
+
+private final class PanelToastView: NSVisualEffectView {
+    private let iconView = NSImageView()
+    private let label = NSTextField(labelWithString: "")
+
+    override var isFlipped: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        material = .popover
+        blendingMode = .withinWindow
+        state = .active
+        wantsLayer = true
+        layer?.cornerRadius = 14
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+        layer?.borderWidth = 0.75
+
+        iconView.image = NSImage(
+            systemSymbolName: "checkmark.circle.fill",
+            accessibilityDescription: nil
+        )?.withSymbolConfiguration(.init(pointSize: 12, weight: .semibold))
+        iconView.imageScaling = .scaleProportionallyDown
+        iconView.contentTintColor = .systemGreen
+        addSubview(iconView)
+
+        label.font = .systemFont(ofSize: 12, weight: .medium)
+        label.lineBreakMode = .byTruncatingMiddle
+        label.maximumNumberOfLines = 1
+        addSubview(label)
+
+        isHidden = true
+        alphaValue = 0
+        applyAppearance()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyAppearance()
+    }
+
+    func applyAppearance() {
+        label.textColor = PanelAppearance.primaryText
+        layer?.borderColor = resolvedCGColor(PanelAppearance.controlBorder)
+    }
+
+    func configure(message: String) {
+        label.stringValue = message
+        applyAppearance()
+        needsLayout = true
+    }
+
+    func preferredSize(maxWidth: CGFloat) -> CGSize {
+        let textWidth = ceil(label.sizeThatFits(NSSize(width: max(40, maxWidth - 44), height: 18)).width)
+        let width = min(maxWidth, max(96, 12 + 14 + 6 + textWidth + 12))
+        return CGSize(width: width, height: 28)
+    }
+
+    override func layout() {
+        super.layout()
+        let iconSize: CGFloat = 14
+        iconView.frame = CGRect(x: 12, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
+        let labelX = iconView.frame.maxX + 6
+        let labelHeight = max(16, ceil(label.sizeThatFits(NSSize(width: 200, height: 20)).height))
+        label.frame = CGRect(
+            x: labelX,
+            y: (bounds.height - labelHeight) / 2,
+            width: max(0, bounds.width - labelX - 12),
+            height: labelHeight
+        )
     }
 }
 

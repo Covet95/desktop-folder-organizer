@@ -61,6 +61,25 @@ final class PanelFileActionCoordinator {
         appStore.canRestoreItem(at: item.path)
     }
 
+    /// Returns the clean POSIX file path for clipboard copying, avoiding percent-encoding and file-URL attachment types.
+    static func standardizedPath(for item: WidgetItem) -> String? {
+        guard !item.path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return URL(fileURLWithPath: item.path).standardizedFileURL.path
+    }
+
+    @discardableResult
+    static func copyPath(
+        of item: WidgetItem,
+        to pasteboard: NSPasteboard = .general
+    ) -> String? {
+        guard let path = standardizedPath(for: item) else { return nil }
+        pasteboard.clearContents()
+        guard pasteboard.setString(path, forType: .string) else { return nil }
+        return path
+    }
+
     func rename(_ item: WidgetItem, from window: NSWindow?) {
         let alert = NSAlert()
         alert.messageText = "重命名文件"

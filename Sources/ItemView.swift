@@ -195,6 +195,10 @@ final class ItemView: NSView, NSDraggingSource {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control) {
+            super.mouseDown(with: event)
+            return
+        }
         window?.makeKey()
         mouseDownPoint = convert(event.locationInWindow, from: nil)
         didStartDrag = false
@@ -224,6 +228,7 @@ final class ItemView: NSView, NSDraggingSource {
     }
 
     override func mouseUp(with event: NSEvent) {
+        guard mouseDownPoint != nil else { return }
         let point = convert(event.locationInWindow, from: nil)
         let shouldOpen = !didStartDrag && bounds.contains(point)
         mouseDownPoint = nil
@@ -247,6 +252,7 @@ final class ItemView: NSView, NSDraggingSource {
         let exists = freshMetadata.exists
 
         let menu = NSMenu()
+        menu.autoenablesItems = false
 
         let open = NSMenuItem(title: "打开", action: #selector(openItem), keyEquivalent: "")
         open.target = self
@@ -262,6 +268,13 @@ final class ItemView: NSView, NSDraggingSource {
         preview.target = self
         preview.isEnabled = exists
         menu.addItem(preview)
+
+        let copyPath = NSMenuItem(title: "复制文件地址", action: #selector(copyItemPath), keyEquivalent: "")
+        copyPath.target = self
+        copyPath.isEnabled = PanelFileActionCoordinator.standardizedPath(for: item) != nil
+        menu.addItem(copyPath)
+
+        menu.addItem(.separator())
 
         let rename = NSMenuItem(title: "重命名…", action: #selector(renameFile), keyEquivalent: "")
         rename.target = self
@@ -312,6 +325,22 @@ final class ItemView: NSView, NSDraggingSource {
 
     @objc private func previewItem() {
         panelView?.preview(item)
+    }
+
+    @objc private func copyItemPath() {
+        copyPath()
+    }
+
+    @discardableResult
+    func copyPath(to pasteboard: NSPasteboard = .general) -> Bool {
+        if let panelView {
+            return panelView.copyPath(item, to: pasteboard)
+        }
+        guard PanelFileActionCoordinator.copyPath(of: item, to: pasteboard) != nil else {
+            NSSound.beep()
+            return false
+        }
+        return true
     }
 
     @objc private func removeItem() {

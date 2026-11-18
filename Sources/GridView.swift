@@ -30,7 +30,7 @@ final class GridView: NSView {
         for view in itemViews {
             view.setLabelColor(color)
         }
-        addTile?.setColor(color)
+        addTile?.needsDisplay = true
     }
 
     func reload(items: [WidgetItem], isSearching: Bool, groupByType: Bool) {
@@ -119,7 +119,7 @@ final class GridView: NSView {
                 return newTile
             }()
             tile.isCompactBanner = groupByType && !orderedItems.isEmpty
-            tile.setColor(labelColor)
+            tile.needsDisplay = true
         } else if let tile = addTile {
             tile.removeFromSuperview()
             addTile = nil
