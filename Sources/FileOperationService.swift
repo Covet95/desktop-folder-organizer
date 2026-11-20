@@ -20,6 +20,7 @@ final class FileOperationService {
     }
 
     struct RestoreOutcome {
+        let kind: FileOperationKind
         let movedURL: URL
         let restoredURL: URL
     }
@@ -31,6 +32,7 @@ final class FileOperationService {
     var onRecoveryAttention: ((String) -> Void)?
 
     private let operationJournal: FileOperationJournal
+    private let trashMover: (URL) throws -> URL
     private let fileOperationQueue = DispatchQueue(
         label: "com.covet.DesktopFolderWidget.file-operations",
         qos: .userInitiated
@@ -38,9 +40,13 @@ final class FileOperationService {
     // Accessed only on fileOperationQueue. Makes overlapping watcher/UI requests idempotent.
     private var absorbedDestinations: [String: URL] = [:]
 
-    init(directory: URL) {
+    init(
+        directory: URL,
+        trashMover: @escaping (URL) throws -> URL = FileOperationService.systemTrashItem
+    ) {
         let journal = FileOperationJournal(directory: directory)
         self.operationJournal = journal
+        self.trashMover = trashMover
         self.initialOperations = journal.operations
         self.loadWarning = journal.loadWarning
     }
@@ -92,6 +98,38 @@ final class FileOperationService {
             return .reject
         }
         return .move
+    }
+
+    static func systemTrashItem(at url: URL) throws -> URL {
+        var resulting: NSURL?
+        try FileManager.default.trashItem(at: url, resultingItemURL: &resulting)
+        if let trashed = resulting as URL? {
+            return trashed.standardizedFileURL
+        }
+        return defaultTrashPlaceholderURL(for: url)
+    }
+
+    static func defaultTrashPlaceholderURL(for url: URL) -> URL {
+        let trashDirectory = FileManager.default.urls(for: .trashDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash", isDirectory: true)
+        return trashDirectory.appendingPathComponent(url.lastPathComponent).standardizedFileURL
+    }
+
+    static func canTrash(
+        url: URL,
+        storageURL: URL,
+        appURL: URL = currentAppBundleURL
+    ) -> Bool {
+        let targetPath = canonicalPath(url)
+        let storagePath = canonicalPath(storageURL)
+        let appPath = canonicalPath(appURL)
+        if isSameOrDescendant(appPath, of: targetPath) {
+            return false
+        }
+        if isSameOrDescendant(storagePath, of: targetPath) {
+            return false
+        }
+        return true
     }
 
     static func uniqueDestination(in directory: URL, name: String) -> URL {
@@ -290,6 +328,61 @@ final class FileOperationService {
         }
     }
 
+    func trashItem(
+        at source: URL,
+        storageURL: URL,
+        completion: @escaping (Result<URL, Error>) -> Void
+    ) {
+        fileOperationQueue.async { [self] in
+            let fileManager = FileManager.default
+            let sourceURL = source.standardizedFileURL
+
+            guard Self.canTrash(url: sourceURL, storageURL: storageURL) else {
+                publishOperations { completion(.failure(FileOperationError.protectedLocation)) }
+                return
+            }
+            guard fileManager.fileExists(atPath: sourceURL.path) else {
+                publishOperations { completion(.failure(FileOperationError.sourceMissing)) }
+                return
+            }
+
+            let placeholderDestination = Self.defaultTrashPlaceholderURL(for: sourceURL)
+            do {
+                let operationID = try operationJournal.prepareMove(
+                    kind: .trash,
+                    source: sourceURL,
+                    destination: placeholderDestination
+                )
+
+                let trashedURL: URL
+                do {
+                    trashedURL = try trashMover(sourceURL).standardizedFileURL
+                } catch {
+                    operationJournal.markFailed(operationID, error: error.localizedDescription)
+                    throw error
+                }
+
+                do {
+                    try operationJournal.markCompleted(operationID, destination: trashedURL)
+                } catch {
+                    operationJournal.markRecoveryPending(
+                        operationID,
+                        error: "文件已移到废纸篓，但操作记录尚未完成写入；下次启动会自动核对。\(error.localizedDescription)"
+                    )
+                    publishRecoveryAttention("文件已移到废纸篓，操作记录正在等待恢复核对")
+                }
+
+                publishOperations {
+                    completion(.success(trashedURL))
+                }
+            } catch {
+                publishOperations {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+
     func restoreOperation(
         _ id: UUID,
         completion: @escaping (Result<RestoreOutcome, Error>) -> Void
@@ -305,8 +398,13 @@ final class FileOperationService {
 
             let movedURL = record.destinationURL
             guard fileManager.fileExists(atPath: movedURL.path) else {
-                operationJournal.markNeedsAttention(id, error: "收纳后的文件已不存在，无法自动恢复")
-                publishRecoveryAttention("有文件已不在收纳目录，无法自动恢复")
+                let missingDetail = record.kind == .trash
+                    ? "废纸篓中的文件已不存在，无法自动恢复"
+                    : "收纳后的文件已不存在，无法自动恢复"
+                operationJournal.markNeedsAttention(id, error: missingDetail)
+                publishRecoveryAttention(
+                    record.kind == .trash ? "废纸篓中的文件已不存在，无法自动恢复" : "有文件已不在收纳目录，无法自动恢复"
+                )
                 publishOperations {
                     completion(.failure(FileOperationError.destinationMissing))
                 }
@@ -372,6 +470,7 @@ final class FileOperationService {
 
                 publishOperations {
                     completion(.success(RestoreOutcome(
+                        kind: record.kind,
                         movedURL: movedURL,
                         restoredURL: restoreURL
                     )))
@@ -413,15 +512,17 @@ enum FileOperationError: LocalizedError {
     case destinationMissing
     case fileIdentityChanged
     case originalFolderMissing
+    case protectedLocation
 
     var errorDescription: String? {
         switch self {
         case .invalidName: return "文件名不能为空，也不能包含路径分隔符或保留名称"
         case .sourceMissing: return "原文件已不存在"
         case .destinationExists: return "目标位置已有同名文件，请换一个名称"
-        case .destinationMissing: return "收纳后的文件已不存在，无法恢复"
+        case .destinationMissing: return "目标位置的文件已不存在，无法恢复"
         case .fileIdentityChanged: return "目标文件身份已变化，为避免误操作已停止恢复"
         case .originalFolderMissing: return "原目录已不存在，请先恢复原目录后重试"
+        case .protectedLocation: return "不能将应用自身或文档整理目录移到废纸篓"
         }
     }
 }

@@ -220,6 +220,12 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
         }
     }
 
+    func trashHoveredItem() {
+        if let hoveredItem {
+            trash(hoveredItem)
+        }
+    }
+
     func preview(_ item: WidgetItem) {
         quickLook.preview(item)
     }
@@ -451,6 +457,16 @@ final class PanelView: NSGlassEffectView, NSPopoverDelegate {
 
     func canRestore(_ item: WidgetItem) -> Bool {
         fileActions.canRestore(item)
+    }
+
+    func trash(_ item: WidgetItem) {
+        fileActions.trash(item, from: window) { [weak self] in
+            self?.showToast("已移到废纸篓")
+        }
+    }
+
+    func canTrash(_ item: WidgetItem) -> Bool {
+        fileActions.canTrash(item)
     }
 
     func requestSettings() {

@@ -157,6 +157,15 @@ final class PanelWindowController: NSWindowController, NSWindowDelegate {
                 return nil
             }
 
+            if modifiers == [.command],
+               event.keyCode == 51,
+               !self.panelView.isSearchActive,
+               !(window.firstResponder is NSTextView),
+               self.panelView.hasHoveredItem {
+                self.panelView.trashHoveredItem()
+                return nil
+            }
+
             return event
         }
     }

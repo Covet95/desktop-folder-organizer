@@ -846,6 +846,62 @@ struct StoreTests {
         expect(lateItemDetected, "watcher recovers when desktop access becomes available")
         lateWatcher.stop()
 
+        let trashRoot = root.appendingPathComponent("TrashStoreTests", isDirectory: true)
+        let trashSupport = trashRoot.appendingPathComponent("Support", isDirectory: true)
+        let trashStorage = trashRoot.appendingPathComponent("Storage", isDirectory: true)
+        let simulatedTrash = trashRoot.appendingPathComponent("TrashBin", isDirectory: true)
+        try! fileManager.createDirectory(at: trashStorage, withIntermediateDirectories: true)
+        try! fileManager.createDirectory(at: simulatedTrash, withIntermediateDirectories: true)
+
+        let trashRepo = InMemoryPanelStateRepository(directory: trashSupport)
+        let trashAppStore = AppStore(
+            persistence: trashRepo,
+            storageDirectory: trashStorage,
+            trashMover: { url in
+                let dest = FileOperationService.uniqueDestination(in: simulatedTrash, name: url.lastPathComponent)
+                try FileManager.default.moveItem(at: url, to: dest)
+                return dest
+            }
+        )
+        trashAppStore.newPanel()
+        let storedFileToTrash = trashStorage.appendingPathComponent("废纸篓测试.pdf")
+        fileManager.createFile(atPath: storedFileToTrash.path, contents: Data("trash".utf8))
+        trashAppStore.panels[0].add(urls: [storedFileToTrash])
+        trashAppStore.panels[1].add(urls: [storedFileToTrash])
+
+        var storeTrashResult: Result<URL, Error>?
+        trashAppStore.trashItem(at: storedFileToTrash) { storeTrashResult = $0 }
+        let storeTrashDeadline = Date().addingTimeInterval(5)
+        while storeTrashResult == nil && Date() < storeTrashDeadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+        }
+        let storeTrashedURL = try? storeTrashResult?.get()
+        expect(
+            storeTrashedURL.map { fileManager.fileExists(atPath: $0.path) } == true
+                && !fileManager.fileExists(atPath: storedFileToTrash.path),
+            "AppStore.trashItem moves file to Trash"
+        )
+        expect(
+            trashAppStore.panels[0].config.items.isEmpty && trashAppStore.panels[1].config.items.isEmpty,
+            "AppStore.trashItem removes references across all panels"
+        )
+        if let trashOp = trashAppStore.fileOperations.first(where: { $0.kind == .trash && $0.canRestore }) {
+            var storeRestoreResult: Result<URL, Error>?
+            trashAppStore.restoreOperation(trashOp.id) { storeRestoreResult = $0 }
+            let storeRestoreDeadline = Date().addingTimeInterval(5)
+            while storeRestoreResult == nil && Date() < storeRestoreDeadline {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+            }
+            expect(
+                (try? storeRestoreResult?.get()) == storedFileToTrash
+                    && fileManager.fileExists(atPath: storedFileToTrash.path)
+                    && trashAppStore.panels[0].config.items.contains { $0.path == storedFileToTrash.path },
+                "AppStore.restoreOperation restores trashed file back into managed storage and panel"
+            )
+        } else {
+            expect(false, "AppStore records restorable trash operation")
+        }
+
         print("")
         if failures == 0 {
             print("ALL TESTS PASSED")

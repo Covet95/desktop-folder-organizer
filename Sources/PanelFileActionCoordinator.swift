@@ -61,6 +61,10 @@ final class PanelFileActionCoordinator {
         appStore.canRestoreItem(at: item.path)
     }
 
+    func canTrash(_ item: WidgetItem) -> Bool {
+        item.exists && FileOperationService.canTrash(url: item.url, storageURL: appStore.storageDirectory)
+    }
+
     /// Returns the clean POSIX file path for clipboard copying, avoiding percent-encoding and file-URL attachment types.
     static func standardizedPath(for item: WidgetItem) -> String? {
         guard !item.path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -132,6 +136,48 @@ final class PanelFileActionCoordinator {
                     )
                 case .failure(let error):
                     NSAlert.showMessage(title: "恢复失败", message: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func trash(
+        _ item: WidgetItem,
+        from window: NSWindow?,
+        onSuccess: (() -> Void)? = nil
+    ) {
+        guard item.exists else {
+            NSSound.beep()
+            return
+        }
+        guard FileOperationService.canTrash(url: item.url, storageURL: appStore.storageDirectory) else {
+            NSAlert.showMessage(
+                title: "无法移到废纸篓",
+                message: FileOperationError.protectedLocation.localizedDescription,
+                from: window
+            )
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "将「\(item.name)」移到废纸篓？"
+        alert.informativeText = "文件将移动到系统废纸篓并从面板中移除，你可在废纸篓或「收纳记录与恢复」中找回。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "移到废纸篓")
+        alert.addButton(withTitle: "取消")
+
+        alert.present(from: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            self?.appStore.trashItem(at: item.url) { result in
+                switch result {
+                case .success:
+                    onSuccess?()
+                case .failure(let error):
+                    NSAlert.showMessage(
+                        title: "移到废纸篓失败",
+                        message: error.localizedDescription,
+                        from: window
+                    )
                 }
             }
         }

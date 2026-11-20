@@ -125,6 +125,70 @@ struct FileOperationServiceTests {
             "failed storage operation leaves the original file untouched"
         )
 
+        let trashDir = root.appendingPathComponent("Trash", isDirectory: true)
+        try! fileManager.createDirectory(at: trashDir, withIntermediateDirectories: true)
+        let trashService = FileOperationService(
+            directory: root.appendingPathComponent("TrashSupport", isDirectory: true),
+            trashMover: { url in
+                let dest = FileOperationService.uniqueDestination(in: trashDir, name: url.lastPathComponent)
+                try FileManager.default.moveItem(at: url, to: dest)
+                return dest
+            }
+        )
+        var trashOperations: [FileOperationRecord] = []
+        trashService.onOperationsChanged = { trashOperations = $0 }
+
+        try! fileManager.createDirectory(at: storage, withIntermediateDirectories: true)
+        let storedToTrash = storage.appendingPathComponent("待删除.pdf")
+        try! Data("trash-me".utf8).write(to: storedToTrash)
+
+        expect(
+            !FileOperationService.canTrash(url: storage, storageURL: storage)
+                && !FileOperationService.canTrash(url: root, storageURL: storage)
+                && FileOperationService.canTrash(url: storedToTrash, storageURL: storage),
+            "canTrash protects storage directory and ancestors while allowing stored files"
+        )
+
+        var protectedResult: Result<URL, Error>?
+        trashService.trashItem(at: storage, storageURL: storage) { protectedResult = $0 }
+        expect(waitUntil { protectedResult != nil }, "service rejects trashing storage directory")
+        if case .failure = protectedResult {
+            expect(fileManager.fileExists(atPath: storage.path), "protected storage directory stays intact")
+        } else {
+            expect(false, "protected storage directory stays intact")
+        }
+
+        var trashResult: Result<URL, Error>?
+        trashService.trashItem(at: storedToTrash, storageURL: storage) { trashResult = $0 }
+        expect(waitUntil { trashResult != nil }, "service completes an asynchronous trash move")
+        let trashedURL = try? trashResult?.get()
+        expect(
+            trashedURL.map { fileManager.fileExists(atPath: $0.path) } == true
+                && !fileManager.fileExists(atPath: storedToTrash.path),
+            "trashItem moves file to trash location"
+        )
+
+        let trashRecord = trashOperations.first { $0.kind == .trash && $0.state == .completed }
+        expect(trashRecord?.fileName == "待删除.pdf", "trash record preserves original file name")
+
+        if let trashRecordID = trashRecord?.id {
+            var undoTrashResult: Result<FileOperationService.RestoreOutcome, Error>?
+            trashService.restoreOperation(trashRecordID) { undoTrashResult = $0 }
+            expect(waitUntil { undoTrashResult != nil }, "service restores a trashed file")
+            if case .success(let outcome) = undoTrashResult {
+                expect(
+                    outcome.kind == .trash
+                        && outcome.restoredURL == storedToTrash
+                        && fileManager.fileExists(atPath: storedToTrash.path),
+                    "restoring trashed file returns it to original location"
+                )
+            } else {
+                expect(false, "restoring trashed file returns it to original location")
+            }
+        } else {
+            expect(false, "restoring trashed file returns it to original location")
+        }
+
         print(failures == 0 ? "ALL FILE OPERATION SERVICE TESTS PASSED" : "\(failures) FILE OPERATION SERVICE TEST(S) FAILED")
         exit(failures == 0 ? 0 : 1)
     }

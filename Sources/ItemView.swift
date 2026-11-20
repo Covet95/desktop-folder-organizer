@@ -297,6 +297,11 @@ final class ItemView: NSView, NSDraggingSource {
         remove.target = self
         menu.addItem(remove)
 
+        let trash = NSMenuItem(title: "移到废纸篓…", action: #selector(trashFile), keyEquivalent: "")
+        trash.target = self
+        trash.isEnabled = exists && (panelView?.canTrash(item) ?? true)
+        menu.addItem(trash)
+
         return menu
     }
 
@@ -353,6 +358,10 @@ final class ItemView: NSView, NSDraggingSource {
 
     @objc private func restoreFile() {
         panelView?.restore(item)
+    }
+
+    @objc private func trashFile() {
+        panelView?.trash(item)
     }
 
     @objc private func relocateItem() {

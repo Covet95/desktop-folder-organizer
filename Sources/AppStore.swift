@@ -30,12 +30,16 @@ final class AppStore: ObservableObject {
 
     init(
         persistence: PanelStateRepository = JSONPanelStateRepository(),
-        storageDirectory: URL? = nil
+        storageDirectory: URL? = nil,
+        trashMover: @escaping (URL) throws -> URL = FileOperationService.systemTrashItem
     ) {
         self.persistence = persistence
         self.configuredStorageDirectory = storageDirectory
 
-        let service = FileOperationService(directory: persistence.supportDirectory)
+        let service = FileOperationService(
+            directory: persistence.supportDirectory,
+            trashMover: trashMover
+        )
         self.fileOperationService = service
         self.fileOperations = service.initialOperations
         rebuildOperationIndexes(from: service.initialOperations)
@@ -151,6 +155,19 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func trashItem(
+        at source: URL,
+        completion: @escaping (Result<URL, Error>) -> Void
+    ) {
+        fileOperationService.trashItem(at: source, storageURL: storageDirectory) { [weak self] result in
+            if case .success = result {
+                self?.removePanelReferences(at: source)
+                self?.saveNow()
+            }
+            completion(result)
+        }
+    }
+
     func restoreOperation(
         _ id: UUID,
         completion: @escaping (Result<URL, Error>) -> Void
@@ -159,6 +176,13 @@ final class AppStore: ObservableObject {
             switch result {
             case .success(let outcome):
                 self?.replacePanelReferences(from: outcome.movedURL, to: outcome.restoredURL)
+                if outcome.kind == .trash, let self {
+                    let restoredCanonical = FileOperationService.canonicalPath(outcome.restoredURL)
+                    let storageCanonical = FileOperationService.canonicalPath(self.storageDirectory)
+                    if FileOperationService.isSameOrDescendant(restoredCanonical, of: storageCanonical) {
+                        self.panels.first?.add(urls: [outcome.restoredURL])
+                    }
+                }
                 self?.saveNow()
                 self?.onFileRestored?(outcome.restoredURL)
                 completion(.success(outcome.restoredURL))
@@ -188,6 +212,13 @@ final class AppStore: ObservableObject {
         let destinationPath = destination.standardizedFileURL.path
         for panel in panels {
             panel.replacePath(from: sourcePath, to: destinationPath)
+        }
+    }
+
+    private func removePanelReferences(at source: URL) {
+        let sourcePath = source.standardizedFileURL.path
+        for panel in panels {
+            panel.removeReferences(at: sourcePath)
         }
     }
 

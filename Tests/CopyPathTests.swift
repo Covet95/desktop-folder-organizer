@@ -122,6 +122,11 @@ struct CopyPathTests {
             expect(copyMenuItem != nil, "item context menu includes 复制文件地址")
             expect(copyMenuItem?.isEnabled == true, "复制文件地址 is enabled for existing files")
             expect(copyMenuItem?.target === fileTile && copyMenuItem?.action != nil, "复制文件地址 targets ItemView")
+
+            let trashMenuItem = fileMenu.items.first { $0.title == "移到废纸篓…" }
+            expect(trashMenuItem != nil, "item context menu includes 移到废纸篓…")
+            expect(trashMenuItem?.isEnabled == true, "移到废纸篓… is enabled for existing files")
+            expect(trashMenuItem?.target === fileTile && trashMenuItem?.action != nil, "移到废纸篓… targets ItemView")
         } else {
             expect(false, "file ItemView returns context menu")
         }
@@ -131,7 +136,9 @@ struct CopyPathTests {
         folderTile.panelView = panelView
         if let folderMenu = folderTile.menu(for: rightClick) {
             let copyMenuItem = folderMenu.items.first { $0.title == "复制文件地址" }
+            let trashMenuItem = folderMenu.items.first { $0.title == "移到废纸篓…" }
             expect(copyMenuItem?.isEnabled == true, "复制文件地址 is enabled for folders")
+            expect(trashMenuItem?.isEnabled == true, "移到废纸篓… is enabled for folders")
         } else {
             expect(false, "folder ItemView returns context menu")
         }
@@ -142,10 +149,23 @@ struct CopyPathTests {
         if let missingMenu = missingTile.menu(for: rightClick) {
             let openMenuItem = missingMenu.items.first { $0.title == "打开" }
             let copyMenuItem = missingMenu.items.first { $0.title == "复制文件地址" }
+            let trashMenuItem = missingMenu.items.first { $0.title == "移到废纸篓…" }
             expect(openMenuItem?.isEnabled == false, "打开 is disabled for missing files")
             expect(copyMenuItem?.isEnabled == true, "复制文件地址 remains enabled for missing items with a recorded path")
+            expect(trashMenuItem?.isEnabled == false, "移到废纸篓… is disabled for missing files")
         } else {
             expect(false, "missing ItemView returns context menu")
+        }
+
+        let storageItem = WidgetItem(path: storageDir.path)
+        let storageMeta = IconProvider.shared.metadata(for: storageItem, forceRefresh: true)
+        let storageTile = ItemView(item: storageItem, metadata: storageMeta, store: panelStore, labelColor: .labelColor)
+        storageTile.panelView = panelView
+        if let storageMenu = storageTile.menu(for: rightClick) {
+            let trashMenuItem = storageMenu.items.first { $0.title == "移到废纸篓…" }
+            expect(trashMenuItem?.isEnabled == false, "移到废纸篓… is disabled for managed storage directory")
+        } else {
+            expect(false, "storage ItemView returns context menu")
         }
 
         let emptyTile = ItemView(item: emptyItem, metadata: .missing, store: panelStore, labelColor: .labelColor)

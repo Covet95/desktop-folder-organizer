@@ -4,12 +4,14 @@ enum FileOperationKind: String, Codable, CaseIterable {
     case automaticAbsorb
     case manualAbsorb
     case rename
+    case trash
 
     var title: String {
         switch self {
         case .automaticAbsorb: return "自动收纳"
         case .manualAbsorb: return "手动收纳"
         case .rename: return "重命名"
+        case .trash: return "移到废纸篓"
         }
     }
 }
@@ -48,7 +50,7 @@ struct FileOperationRecord: Codable, Identifiable, Equatable {
     var errorMessage: String?
 
     var fileName: String {
-        URL(fileURLWithPath: destinationPath).lastPathComponent
+        kind == .trash ? sourceURL.lastPathComponent : destinationURL.lastPathComponent
     }
 
     var canRestore: Bool {
@@ -119,8 +121,11 @@ final class FileOperationJournal {
         }
     }
 
-    func markCompleted(_ id: UUID) throws {
+    func markCompleted(_ id: UUID, destination: URL? = nil) throws {
         try update(id) { record in
+            if let destination {
+                record.destinationPath = destination.standardizedFileURL.path
+            }
             record.state = .completed
             record.fileResourceIdentifier = Self.resourceIdentifier(at: record.destinationURL)
             record.updatedAt = Date()

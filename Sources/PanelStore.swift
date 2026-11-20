@@ -75,6 +75,16 @@ final class PanelStore: ObservableObject, Identifiable {
         config.items.removeAll { $0.id == id }
     }
 
+    func removeReferences(at path: String) {
+        let target = URL(fileURLWithPath: path).standardizedFileURL.path
+        let filtered = config.items.filter {
+            URL(fileURLWithPath: $0.path).standardizedFileURL.path != target
+        }
+        if filtered.count != config.items.count {
+            config.items = filtered
+        }
+    }
+
     func removeMissing() {
         config.items.removeAll { !$0.exists }
     }
